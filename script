@@ -1,0 +1,115 @@
+-- Create the main GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AnimalInfoDisplay"
+gui.ResetOnSpawn = false
+gui.Parent = game:GetService("CoreGui") -- Use CoreGui for executor compatibility
+
+-- Create the frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 400)
+frame.Position = UDim2.new(0.5, -150, 0.5, -200)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+-- Create title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Rendered Moving Animals"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 18
+title.Parent = frame
+
+-- Create scroll frame
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -10, 1, -40)
+scrollFrame.Position = UDim2.new(0, 5, 0, 35)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.Parent = frame
+
+-- Create UIListLayout
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 5)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = scrollFrame
+
+-- Function to update the display
+local function updateDisplay()
+    -- Clear existing labels
+    for _, child in ipairs(scrollFrame:GetChildren()) do
+        if child:IsA("TextLabel") then
+            child:Destroy()
+        end
+    end
+
+    local animals = workspace:FindFirstChild("RenderedMovingAnimals")
+    if not animals then
+        local noAnimalsLabel = Instance.new("TextLabel")
+        noAnimalsLabel.Size = UDim2.new(1, -10, 0, 20)
+        noAnimalsLabel.BackgroundTransparency = 1
+        noAnimalsLabel.Text = "RenderedMovingAnimals not found"
+        noAnimalsLabel.TextColor3 = Color3.new(1, 1, 1)
+        noAnimalsLabel.Font = Enum.Font.SourceSans
+        noAnimalsLabel.TextSize = 14
+        noAnimalsLabel.TextXAlignment = Enum.TextXAlignment.Left
+        noAnimalsLabel.Parent = scrollFrame
+        return
+    end
+
+    local totalHeight = 0
+    for _, animal in ipairs(animals:GetChildren()) do
+        local info = string.format(
+            "%s [%d] - Pos: (%.1f, %.1f, %.1f)",
+            animal.Name,
+            animal:GetDebugId(100):sub(1, 4):byte(1) or 0,
+            animal.PrimaryPart and animal.PrimaryPart.Position.X or 0,
+            animal.PrimaryPart and animal.PrimaryPart.Position.Y or 0,
+            animal.PrimaryPart and animal.PrimaryPart.Position.Z or 0
+        )
+        
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, -10, 0, 20)
+        label.BackgroundTransparency = 1
+        label.Text = info
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.Font = Enum.Font.SourceSans
+        label.TextSize = 14
+        label.TextXAlignment = Enum.TextXAlignment.Left
+        label.Parent = scrollFrame
+        
+        totalHeight = totalHeight + 25
+    end
+    
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+end
+
+-- Initial update
+updateDisplay()
+
+-- Update every 0.5 seconds
+game:GetService("RunService").Heartbeat:Connect(function()
+    if tick() % 0.5 < 0.1 then
+        updateDisplay()
+    end
+end)
+
+-- Close button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 20, 0, 20)
+closeBtn.Position = UDim2.new(1, -25, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.TextSize = 14
+closeBtn.Parent = frame
+
+closeBtn.MouseButton1Click:Connect(function()
+    gui:Destroy()
+end)
