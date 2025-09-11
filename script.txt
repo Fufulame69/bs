@@ -1,203 +1,51 @@
---[[
-    Script: Advanced Animal Finder & Auto-Buyer
-    Description: Provides a GUI to find and automatically pathfind to and purchase
-                 in-game animals based on user-defined criteria (Name, Rarity,
-                 Price, or Generation).
-    Features:
-        - Draggable and toggleable GUI (Default key: RightShift).
-        - Complete, built-in library of all animals and their stats.
-        - Four targeting modes:
-            1. By Name: Searches for a specific animal name.
-            2. By Rarity: Targets any animal of a chosen rarity.
-            3. By Price: Targets any animal at or above a certain price.
-            4. By Generation: Targets any animal at or above a certain generation value.
-        - Auto-walk & auto-buy functionality.
-        - Lists all currently spawned animals for easy reference.
-]]
+--// ====== SETTINGS ======
+local RENDERED_FOLDER_NAME = "RenderedMovingAnimals"
 
--- =================================================================
--- ==================== ANIMAL DATA LIBRARY ========================
--- =================================================================
--- This library contains all animal attributes parsed from your file.
-local animalLibrary = {
-	["Noobini Pizzanini"] = {Rarity = "Common", Price = 25, Generation = 1},
-	["Lirilì Larilà"] = {Rarity = "Common", Price = 250, Generation = 3},
-	["Tim Cheese"] = {Rarity = "Common", Price = 500, Generation = 5},
-	["Fluriflura"] = {Rarity = "Common", Price = 750, Generation = 7},
-	["Svinina Bombardino"] = {Rarity = "Common", Price = 1250, Generation = 10},
-	["Talpa Di Fero"] = {Rarity = "Common", Price = 1000, Generation = 9},
-	["Pipi Kiwi"] = {Rarity = "Common", Price = 1500, Generation = 13},
-	["Pipi Corni"] = {Rarity = "Common", Price = 1750, Generation = 14},
-	["Raccooni Jandelini"] = {Rarity = "Common", Price = 1350, Generation = 12},
-	["Trippi Troppi"] = {Rarity = "Rare", Price = 2000, Generation = 15},
-	["Tung Tung Tung Sahur"] = {Rarity = "Rare", Price = 3000, Generation = 25},
-	["Gangster Footera"] = {Rarity = "Rare", Price = 4000, Generation = 30},
-	["Boneca Ambalabu"] = {Rarity = "Rare", Price = 5000, Generation = 40},
-	["Ta Ta Ta Ta Sahur"] = {Rarity = "Rare", Price = 7500, Generation = 55},
-	["Tric Trac Baraboom"] = {Rarity = "Rare", Price = 9000, Generation = 65},
-	["Bandito Bobritto"] = {Rarity = "Rare", Price = 4500, Generation = 35},
-	["Cacto Hipopotamo"] = {Rarity = "Rare", Price = 6500, Generation = 50},
-	["Pipi Avocado"] = {Rarity = "Rare", Price = 9500, Generation = 70},
-	["Cappuccino Assassino"] = {Rarity = "Epic", Price = 10000, Generation = 75},
-	["Brr Brr Patapim"] = {Rarity = "Epic", Price = 15000, Generation = 100},
-	["Trulimero Trulicina"] = {Rarity = "Epic", Price = 20000, Generation = 125},
-	["Bananita Dolphinita"] = {Rarity = "Epic", Price = 25000, Generation = 150},
-	["Brri Brri Bicus Dicus Bombicus"] = {Rarity = "Epic", Price = 30000, Generation = 175},
-	["Bambini Crostini"] = {Rarity = "Epic", Price = 22500, Generation = 135},
-	["Perochello Lemonchello"] = {Rarity = "Epic", Price = 27500, Generation = 160},
-	["Avocadini Guffo"] = {Rarity = "Epic", Price = 35000, Generation = 225},
-	["Salamino Penguino"] = {Rarity = "Epic", Price = 40000, Generation = 250},
-	["Ti Ti Ti Sahur"] = {Rarity = "Epic", Price = 37500, Generation = 225},
-	["Penguino Cocosino"] = {Rarity = "Epic", Price = 45000, Generation = 300},
-	["Avocadini Antilopini"] = {Rarity = "Epic", Price = 17500, Generation = 115},
-	["Bandito Axolito"] = {Rarity = "Epic", Price = 12500, Generation = 90},
-	["Malame Amarele"] = {Rarity = "Epic", Price = 23500, Generation = 140},
-	["Mangolini Parrocini"] = {Rarity = "Epic", Price = 38500, Generation = 235},
-	["Burbaloni Loliloli"] = {Rarity = "Legendary", Price = 35000, Generation = 200},
-	["Chimpanzini Bananini"] = {Rarity = "Legendary", Price = 50000, Generation = 300},
-	["Ballerina Cappuccina"] = {Rarity = "Legendary", Price = 100000, Generation = 500},
-	["Chef Crabracadabra"] = {Rarity = "Legendary", Price = 150000, Generation = 600},
-	["Glorbo Fruttodrillo"] = {Rarity = "Legendary", Price = 200000, Generation = 750},
-	["Blueberrinni Octopusini"] = {Rarity = "Legendary", Price = 250000, Generation = 1000},
-	["Lionel Cactuseli"] = {Rarity = "Legendary", Price = 175000, Generation = 650},
-	["Pandaccini Bananini"] = {Rarity = "Legendary", Price = 300000, Generation = 1250},
-	["Strawberrelli Flamingelli"] = {Rarity = "Legendary", Price = 275000, Generation = 1150},
-	["Cocosini Mama"] = {Rarity = "Legendary", Price = 285000, Generation = 1200},
-	["Pi Pi Watermelon"] = {Rarity = "Legendary", Price = 315000, Generation = 1300},
-	["Sigma Boy"] = {Rarity = "Legendary", Price = 325000, Generation = 1350},
-	["Pipi Potato"] = {Rarity = "Legendary", Price = 265000, Generation = 1100},
-	["Quivioli Ameleonni"] = {Rarity = "Legendary", Price = 225000, Generation = 900},
-	["Tirilikalika Tirilikalako"] = {Rarity = "Legendary", Price = 75000, Generation = 450},
-	["Caramello Filtrello"] = {Rarity = "Legendary", Price = 255000, Generation = 1050},
-	["Signore Carapace"] = {Rarity = "Legendary", Price = 320000, Generation = 1325},
-	["Frigo Camelo"] = {Rarity = "Mythic", Price = 350000, Generation = 1400},
-	["Orangutini Ananassini"] = {Rarity = "Mythic", Price = 400000, Generation = 1750},
-	["Bombardiro Crocodilo"] = {Rarity = "Mythic", Price = 500000, Generation = 2500},
-	["Bombombini Gusini"] = {Rarity = "Mythic", Price = 1000000, Generation = 5000},
-	["Rhino Toasterino"] = {Rarity = "Mythic", Price = 450000, Generation = 2150},
-	["Cavallo Virtuoso"] = {Rarity = "Mythic", Price = 2500000, Generation = 7500},
-	["Spioniro Golubiro"] = {Rarity = "Mythic", Price = 750000, Generation = 3500},
-	["Zibra Zubra Zibralini"] = {Rarity = "Mythic", Price = 1500000, Generation = 6000},
-	["Tigrilini Watermelini"] = {Rarity = "Mythic", Price = 1750000, Generation = 6500},
-	["Gorillo Watermelondrillo"] = {Rarity = "Mythic", Price = 3000000, Generation = 8000},
-	["Avocadorilla"] = {Rarity = "Mythic", Price = 2000000, Generation = 7000},
-	["Ganganzelli Trulala"] = {Rarity = "Mythic", Price = 3750000, Generation = 9000},
-	["Tob Tobi Tobi"] = {Rarity = "Mythic", Price = 3250000, Generation = 8500},
-	["Te Te Te Sahur"] = {Rarity = "Mythic", Price = 4000000, Generation = 9500},
-	["Tracoducotulu Delapeladustuz"] = {Rarity = "Mythic", Price = 4250000, Generation = 12000},
-	["Lerulerulerule"] = {Rarity = "Mythic", Price = 3500000, Generation = 8750},
-	["Carloo"] = {Rarity = "Mythic", Price = 4500000, Generation = 13500},
-	["Carrotini Brainini"] = {Rarity = "Mythic", Price = 4750000, Generation = 15000},
-	["Brutto Gialutto"] = {Rarity = "Mythic", Price = 600000, Generation = 3000},
-	["Gorillo Subwoofero"] = {Rarity = "Mythic", Price = 2750000, Generation = 7750},
-	["Los Noobinis"] = {Rarity = "Mythic", Price = 4350000, Generation = 12500},
-	["Chihuanini Taconini"] = {Rarity = "Brainrot God", Price = 8500000, Generation = 45000},
-	["Cocofanto Elefanto"] = {Rarity = "Brainrot God", Price = 5000000, Generation = 17500},
-	["Tralalero Tralala"] = {Rarity = "Brainrot God", Price = 10000000, Generation = 50000},
-	["Odin Din Din Dun"] = {Rarity = "Brainrot God", Price = 15000000, Generation = 75000},
-	["Girafa Celestre"] = {Rarity = "Brainrot God", Price = 7500000, Generation = 20000},
-	["Trenostruzzo Turbo 3000"] = {Rarity = "Brainrot God", Price = 25000000, Generation = 150000},
-	["Matteo"] = {Rarity = "Brainrot God", Price = 10000000, Generation = 50000},
-	["Tigroligre Frutonni"] = {Rarity = "Brainrot God", Price = 14000000, Generation = 60000},
-	["Orcalero Orcala"] = {Rarity = "Brainrot God", Price = 25000000, Generation = 100000},
-	["Unclito Samito"] = {Rarity = "Brainrot God", Price = 20000000, Generation = 75000},
-	["Gattatino Nyanino"] = {Rarity = "Brainrot God", Price = 7500000, Generation = 35000},
-	["Espresso Signora"] = {Rarity = "Brainrot God", Price = 25000000, Generation = 70000},
-	["Ballerino Lololo"] = {Rarity = "Brainrot God", Price = 35000000, Generation = 200000},
-	["Piccione Macchina"] = {Rarity = "Brainrot God", Price = 40000000, Generation = 225000},
-	["Los Crocodillitos"] = {Rarity = "Brainrot God", Price = 12500000, Generation = 55000},
-	["Tukanno Bananno"] = {Rarity = "Brainrot God", Price = 22500000, Generation = 100000},
-	["Trippi Troppi Troppa Trippa"] = {Rarity = "Brainrot God", Price = 30000000, Generation = 175000},
-	["Los Tungtungtungcitos"] = {Rarity = "Brainrot God", Price = 37500000, Generation = 210000},
-	["Agarrini la Palini"] = {Rarity = "Brainrot God", Price = 80000000, Generation = 425000},
-	["Bulbito Bandito Traktorito"] = {Rarity = "Brainrot God", Price = 35000000, Generation = 205000},
-	["Los Orcalitos"] = {Rarity = "Brainrot God", Price = 45000000, Generation = 235000},
-	["Tipi Topi Taco"] = {Rarity = "Brainrot God", Price = 20000000, Generation = 75000},
-	["Bombardini Tortinii"] = {Rarity = "Brainrot God", Price = 50000000, Generation = 225000},
-	["Tralalita Tralala"] = {Rarity = "Brainrot God", Price = 20000000, Generation = 100000},
-	["Urubini Flamenguini"] = {Rarity = "Brainrot God", Price = 30000000, Generation = 150000},
-	["Alessio"] = {Rarity = "Brainrot God", Price = 17500000, Generation = 85000},
-	["Pakrahmatmamat"] = {Rarity = "Brainrot God", Price = 37500000, Generation = 215000},
-	["Los Bombinitos"] = {Rarity = "Brainrot God", Price = 42500000, Generation = 220000},
-	["Brr es Teh Patipum"] = {Rarity = "Brainrot God", Price = 40000000, Generation = 225000},
-	["Tartaruga Cisterna"] = {Rarity = "Brainrot God", Price = 45000000, Generation = 250000},
-	["Cacasito Satalito"] = {Rarity = "Brainrot God", Price = 45000000, Generation = 240000},
-	["Mastodontico Telepiedone"] = {Rarity = "Brainrot God", Price = 47500000, Generation = 275000},
-	["Crabbo Limonetta"] = {Rarity = "Brainrot God", Price = 46000000, Generation = 235000},
-	["Gattito Tacoto"] = {Rarity = "Brainrot God", Price = 32500000, Generation = 165000},
-	["Los Tipi Tacos"] = {Rarity = "Brainrot God", Price = 46000000, Generation = 260000},
-	["Antonio"] = {Rarity = "Brainrot God", Price = 6000000, Generation = 18500},
-	["Las Capuchinas"] = {Rarity = "Brainrot God", Price = 32500000, Generation = 185000},
-	["Orcalita Orcala"] = {Rarity = "Brainrot God", Price = 45000000, Generation = 240000},
-	["Piccionetta Macchina"] = {Rarity = "Brainrot God", Price = 47000000, Generation = 270000},
-	["Anpali Babel"] = {Rarity = "Brainrot God", Price = 48000000, Generation = 280000},
-	["La Vacca Saturno Saturnita"] = {Rarity = "Secret", Price = 50000000, Generation = 300000},
-	["Los Tralaleritos"] = {Rarity = "Secret", Price = 100000000, Generation = 500000},
-	["Graipuss Medussi"] = {Rarity = "Secret", Price = 250000000, Generation = 1000000},
-	["La Grande Combinasion"] = {Rarity = "Secret", Price = 1000000000, Generation = 10000000},
-	["Sammyni Spyderini"] = {Rarity = "Secret", Price = 75000000, Generation = 325000},
-	["Garama and Madundung"] = {Rarity = "Secret", Price = 10000000000, Generation = 50000000},
-	["Torrtuginni Dragonfrutini"] = {Rarity = "Secret", Price = 125000000, Generation = 350000},
-	["Las Tralaleritas"] = {Rarity = "Secret", Price = 150000000, Generation = 650000},
-	["Pot Hotspot"] = {Rarity = "Secret", Price = 600000000, Generation = 2500000},
-	["Nuclearo Dinossauro"] = {Rarity = "Secret", Price = 2500000000, Generation = 15000000},
-	["Las Vaquitas Saturnitas"] = {Rarity = "Secret", Price = 200000000, Generation = 750000},
-	["Chicleteira Bicicleteira"] = {Rarity = "Secret", Price = 750000000, Generation = 3500000},
-	["Los Combinasionas"] = {Rarity = "Secret", Price = 2000000000, Generation = 15000000},
-	["Karkerkar Kurkur"] = {Rarity = "Secret", Price = 100000000, Generation = 300000},
-	["Dragon Cannelloni"] = {Rarity = "Secret", Price = 100000000000, Generation = 100000000},
-	["Los Hotspotsitos"] = {Rarity = "Secret", Price = 3000000000, Generation = 20000000},
-	["Esok Sekolah"] = {Rarity = "Secret", Price = 3500000000, Generation = 30000000},
-	["Nooo My Hotspot"] = {Rarity = "Secret", Price = 500000000, Generation = 1500000},
-	["Los Matteos"] = {Rarity = "Secret", Price = 100000000, Generation = 300000},
-	["Job Job Job Sahur"] = {Rarity = "Secret", Price = 175000000, Generation = 700000},
-	["Dul Dul Dul"] = {Rarity = "Secret", Price = 150000000, Generation = 375000},
-	["Blackhole Goat"] = {Rarity = "Secret", Price = 75000000, Generation = 400000},
-	["Los Spyderinis"] = {Rarity = "Secret", Price = 125000000, Generation = 425000},
-	["Ketupat Kepat"] = {Rarity = "Secret", Price = 5000000000, Generation = 35000000},
-	["La Supreme Combinasion"] = {Rarity = "Secret", Price = 7000000000, Generation = 40000000},
-	["Bisonte Giuppitere"] = {Rarity = "Secret", Price = 75000000, Generation = 300000},
-	["Guerriro Digitale"] = {Rarity = "Secret", Price = 120000000, Generation = 550000},
-	["Ketchuru and Musturu"] = {Rarity = "Secret", Price = 7500000000, Generation = 42500000},
-	["Spaghetti Tualetti"] = {Rarity = "Secret", Price = 15000000000, Generation = 60000000},
-	["Los Nooo My Hotspotsitos"] = {Rarity = "Secret", Price = 1000000000, Generation = 5000000},
-	["Trenostruzzo Turbo 4000"] = {Rarity = "Secret", Price = 100000000, Generation = 310000},
-	["Fragola La La La"] = {Rarity = "Secret", Price = 125000000, Generation = 450000},
-	["La Sahur Combinasion"] = {Rarity = "Secret", Price = 550000000, Generation = 2000000},
-	["La Karkerkar Combinasion"] = {Rarity = "Secret", Price = 160000000, Generation = 600000},
-	["Tralaledon"] = {Rarity = "Secret", Price = 3000000000, Generation = 27500000},
-	["Los Bros"] = {Rarity = "Secret", Price = 6000000000, Generation = 37500000},
-	["Strawberry Elephant"] = {Rarity = "OG", Price = 500000000000, Generation = 250000000},
-	["Lucky Block"] = {Rarity = "Admin", Price = 100000000, Generation = 0} -- Simplified for multiple lucky blocks
-}
+--// ====== LOAD ANIMALS DB ======
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local AnimalsModule = require(ReplicatedStorage:WaitForChild("Datas"):WaitForChild("Animals"))
 
-local ALL_RARITIES = {"Common", "Rare", "Epic", "Legendary", "Mythic", "Brainrot God", "Secret", "OG", "Admin", "Taco"}
+-- AnimalsModule is expected to be a table like:
+-- ["Noobini Pizzanini"] = { DisplayName="Noobini Pizzanini"; Rarity="Common"; Price=25; Generation=1; RoadWeight=100; }
+-- We will normalize it into a list we can iterate & sort.
+local Brainrots = {}
+for key, data in pairs(AnimalsModule) do
+	if typeof(data) == "table" then
+		table.insert(Brainrots, {
+			Key = key,
+			DisplayName = data.DisplayName or key,
+			Rarity = data.Rarity,
+			Price = tonumber(data.Price) or 0,
+			Generation = tonumber(data.Generation) or 0,
+			RoadWeight = data.RoadWeight
+		})
+	end
+end
+table.sort(Brainrots, function(a,b) return tostring(a.DisplayName) < tostring(b.DisplayName) end)
 
--- =================================================================
--- =================== GUI AND CORE SCRIPT =========================
--- =================================================================
-
--- Stop script if it's already running
-if game:GetService("CoreGui"):FindFirstChild("AnimalInfoDisplay") then
-    game:GetService("CoreGui").AnimalInfoDisplay:Destroy()
+-- Fast lookup by DisplayName and by Key
+local ByDisplay = {}
+local ByKey = {}
+for _, br in ipairs(Brainrots) do
+	ByDisplay[br.DisplayName] = br
+	ByKey[br.Key] = br
 end
 
--- Create the main GUI
+--// ====== MAIN GUI ======
 local gui = Instance.new("ScreenGui")
 gui.Name = "AnimalInfoDisplay"
 gui.ResetOnSpawn = false
 gui.Parent = game:GetService("CoreGui")
 
--- Create the frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 320, 0, 500)
-frame.Position = UDim2.new(0.5, -160, 0.5, -250)
+frame.Size = UDim2.new(0, 340, 0, 560)
+frame.Position = UDim2.new(0.5, -170, 0.5, -280)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Parent = gui
 
--- ===== DRAGGING (custom) =====
+-- ===== DRAGGING =====
 local UIS = game:GetService("UserInputService")
 local dragging, dragStart, startPos
 local function onInputBegan(input, gpe)
@@ -227,12 +75,14 @@ frame.InputEnded:Connect(onInputEnded)
 
 -- Title
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
+title.Size = UDim2.new(1, -30, 0, 30)
+title.Position = UDim2.new(0, 10, 0, 6)
 title.BackgroundTransparency = 1
-title.Text = "Advanced Animal Finder"
+title.Text = "Rendered Moving Animals"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = frame
 title.InputBegan:Connect(onInputBegan)
 title.InputChanged:Connect(onInputChanged)
@@ -252,13 +102,13 @@ closeBtn.MouseButton1Click:Connect(function() gui:Destroy() end)
 
 -- Keybind row
 local keyRow = Instance.new("Frame")
-keyRow.Size = UDim2.new(1, -10, 0, 25)
-keyRow.Position = UDim2.new(0, 5, 0, 35)
+keyRow.Size = UDim2.new(1, -20, 0, 24)
+keyRow.Position = UDim2.new(0, 10, 0, 40)
 keyRow.BackgroundTransparency = 1
 keyRow.Parent = frame
 
 local keyLbl = Instance.new("TextLabel")
-keyLbl.Size = UDim2.new(0, 100, 1, 0)
+keyLbl.Size = UDim2.new(0, 90, 1, 0)
 keyLbl.BackgroundTransparency = 1
 keyLbl.Text = "Toggle key:"
 keyLbl.TextColor3 = Color3.new(1, 1, 1)
@@ -268,21 +118,20 @@ keyLbl.TextXAlignment = Enum.TextXAlignment.Left
 keyLbl.Parent = keyRow
 
 local keyBox = Instance.new("TextBox")
-keyBox.Size = UDim2.new(1, -105, 1, 0)
-keyBox.Position = UDim2.new(0, 100, 0, 0)
-keyBox.PlaceholderText = "e.g. RightShift"
+keyBox.Size = UDim2.new(1, -95, 1, 0)
+keyBox.Position = UDim2.new(0, 95, 0, 0)
+keyBox.PlaceholderText = "e.g. RightShift, P, F4"
 keyBox.Text = "RightShift"
-keyBox.BackgroundColor3 = Color3.new(1,1,1)
-keyBox.TextColor3 = Color3.fromRGB(0, 150, 0)
+keyBox.TextColor3 = Color3.new(0, 0, 0)
 keyBox.Font = Enum.Font.SourceSans
 keyBox.TextSize = 14
 keyBox.Parent = keyRow
 
 -- Auto-walk & buy toggle
 local autoBtn = Instance.new("TextButton")
-autoBtn.Size = UDim2.new(1, -10, 0, 24)
-autoBtn.Position = UDim2.new(0, 5, 0, 65)
-autoBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+autoBtn.Size = UDim2.new(1, -20, 0, 24)
+autoBtn.Position = UDim2.new(0, 10, 0, 70)
+autoBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 autoBtn.TextColor3 = Color3.new(1, 1, 1)
 autoBtn.Font = Enum.Font.SourceSansBold
 autoBtn.TextSize = 14
@@ -292,173 +141,113 @@ local autoEnabled = true
 autoBtn.MouseButton1Click:Connect(function()
 	autoEnabled = not autoEnabled
 	autoBtn.Text = "Auto-walk & buy: " .. (autoEnabled and "ON" or "OFF")
-    autoBtn.BackgroundColor3 = autoEnabled and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(180, 0, 0)
 end)
 
--- Status label
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -10, 0, 20)
-statusLabel.Position = UDim2.new(0, 5, 0, 235)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status: Idle"
-statusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-statusLabel.Font = Enum.Font.SourceSansBold
-statusLabel.TextSize = 16
-statusLabel.Parent = frame
+-- Warning label
+local warningLabel = Instance.new("TextLabel")
+warningLabel.Size = UDim2.new(1, -20, 0, 18)
+warningLabel.Position = UDim2.new(0, 10, 0, 98)
+warningLabel.BackgroundTransparency = 1
+warningLabel.Text = ""
+warningLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+warningLabel.Font = Enum.Font.SourceSansBold
+warningLabel.TextSize = 16
+warningLabel.Visible = false
+warningLabel.Parent = frame
 
--- === NEW: Search Criteria Selection ===
-local searchMode = "Name"
-local searchInputs = {
-    Name = "",
-    Rarity = "Common",
-    Price = 0,
-    Generation = 0
-}
+-- ===== FILTER HEADER & MODE =====
+local filterHeader = Instance.new("TextLabel")
+filterHeader.Size = UDim2.new(1, -20, 0, 22)
+filterHeader.Position = UDim2.new(0, 10, 0, 120)
+filterHeader.BackgroundTransparency = 1
+filterHeader.Text = "Chase by:"
+filterHeader.TextColor3 = Color3.new(1, 1, 1)
+filterHeader.Font = Enum.Font.SourceSansBold
+filterHeader.TextSize = 16
+filterHeader.TextXAlignment = Enum.TextXAlignment.Left
+filterHeader.Parent = frame
 
-local criteriaFrame = Instance.new("Frame")
-criteriaFrame.Size = UDim2.new(1, -10, 0, 130)
-criteriaFrame.Position = UDim2.new(0, 5, 0, 95)
-criteriaFrame.BackgroundTransparency = 1
-criteriaFrame.Parent = frame
+local modes = {"Display Name","Price ≥","Generation ≥"}
+local currentModeIndex = 1
 
-local criteriaLabel = Instance.new("TextLabel")
-criteriaLabel.Size = UDim2.new(1, 0, 0, 20)
-criteriaLabel.BackgroundTransparency = 1
-criteriaLabel.Text = "Targeting Mode:"
-criteriaLabel.TextColor3 = Color3.new(1,1,1)
-criteriaLabel.Font = Enum.Font.SourceSans
-criteriaLabel.TextSize = 14
-criteriaLabel.TextXAlignment = Enum.TextXAlignment.Left
-criteriaLabel.Parent = criteriaFrame
+local modeBtn = Instance.new("TextButton")
+modeBtn.Size = UDim2.new(1, -20, 0, 26)
+modeBtn.Position = UDim2.new(0, 10, 0, 145)
+modeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+modeBtn.TextColor3 = Color3.new(1, 1, 1)
+modeBtn.Font = Enum.Font.SourceSansBold
+modeBtn.TextSize = 14
+modeBtn.Text = "Mode: " .. modes[currentModeIndex]
+modeBtn.Parent = frame
 
--- Mode selection buttons
-local modeButtonsFrame = Instance.new("Frame")
-modeButtonsFrame.Size = UDim2.new(1, 0, 0, 25)
-modeButtonsFrame.Position = UDim2.new(0, 0, 0, 20)
-modeButtonsFrame.BackgroundTransparency = 1
-modeButtonsFrame.Parent = criteriaFrame
-local modeLayout = Instance.new("UIListLayout")
-modeLayout.FillDirection = Enum.FillDirection.Horizontal
-modeLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-modeLayout.Spacing = UDim.new(0, 5)
-modeLayout.Parent = modeButtonsFrame
+-- ===== INPUTS PER MODE =====
 
--- Input fields container
-local inputContainer = Instance.new("Frame")
-inputContainer.Size = UDim2.new(1, 0, 1, -50)
-inputContainer.Position = UDim2.new(0, 0, 0, 50)
-inputContainer.BackgroundTransparency = 1
-inputContainer.Parent = criteriaFrame
+-- DisplayName cycler
+local nameIndex = 1
+local nameBtn = Instance.new("TextButton")
+nameBtn.Size = UDim2.new(1, -20, 0, 24)
+nameBtn.Position = UDim2.new(0, 10, 0, 175)
+nameBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+nameBtn.TextColor3 = Color3.new(1,1,1)
+nameBtn.Font = Enum.Font.SourceSans
+nameBtn.TextSize = 14
+nameBtn.Text = (#Brainrots > 0) and ("Display: " .. Brainrots[nameIndex].DisplayName) or "No brainrots"
+nameBtn.Parent = frame
+nameBtn.MouseButton1Click:Connect(function()
+	if #Brainrots == 0 then return end
+	nameIndex = nameIndex % #Brainrots + 1
+	nameBtn.Text = "Display: " .. Brainrots[nameIndex].DisplayName
+	updateDisplay()
+end)
 
--- Name Input
-local nameInput = Instance.new("TextBox")
-nameInput.Size = UDim2.new(1, 0, 0, 30)
-nameInput.PlaceholderText = "Type animal name..."
-nameInput.Text = ""
-nameInput.BackgroundColor3 = Color3.new(1,1,1)
-nameInput.TextColor3 = Color3.new(0,0,0)
-nameInput.Font = Enum.Font.SourceSans
-nameInput.TextSize = 14
-nameInput.Parent = inputContainer
-nameInput.Visible = true -- Default mode
-nameInput.FocusLost:Connect(function() searchInputs.Name = nameInput.Text end)
+-- Price ≥ threshold
+local priceRow = Instance.new("Frame")
+priceRow.Size = UDim2.new(1, -20, 0, 24)
+priceRow.Position = UDim2.new(0, 10, 0, 175)
+priceRow.BackgroundTransparency = 1
+priceRow.Parent = frame
 
+local priceMin = Instance.new("TextBox")
+priceMin.Size = UDim2.new(1, 0, 1, 0)
+priceMin.PlaceholderText = "Enter minimum Price (≥)"
+priceMin.Text = ""
+priceMin.TextColor3 = Color3.new(0,0,0)
+priceMin.Font = Enum.Font.SourceSans
+priceMin.TextSize = 14
+priceMin.Parent = priceRow
 
--- Rarity Input
-local rarityFrame = Instance.new("ScrollingFrame")
-rarityFrame.Size = UDim2.new(1, 0, 1, 0)
-rarityFrame.BackgroundTransparency = 1
-rarityFrame.ScrollBarThickness = 6
-rarityFrame.Parent = inputContainer
-rarityFrame.Visible = false
-local rarityLayout = Instance.new("UIGridLayout")
-rarityLayout.CellPadding = UDim2.new(0, 5, 0, 5)
-rarityLayout.CellSize = UDim2.new(0, 90, 0, 25)
-rarityLayout.Parent = rarityFrame
+-- Generation ≥ threshold
+local genRow = Instance.new("Frame")
+genRow.Size = UDim2.new(1, -20, 0, 24)
+genRow.Position = UDim2.new(0, 10, 0, 175)
+genRow.BackgroundTransparency = 1
+genRow.Parent = frame
 
--- Price Input
-local priceInput = Instance.new("TextBox")
-priceInput.Size = UDim2.new(1, 0, 0, 30)
-priceInput.PlaceholderText = "Minimum price (e.g., 50000)"
-priceInput.Text = ""
-priceInput.NumbersOnly = true
-priceInput.BackgroundColor3 = Color3.new(1,1,1)
-priceInput.TextColor3 = Color3.new(0,0,0)
-priceInput.Font = Enum.Font.SourceSans
-priceInput.TextSize = 14
-priceInput.Parent = inputContainer
-priceInput.Visible = false
-priceInput.FocusLost:Connect(function() searchInputs.Price = tonumber(priceInput.Text) or 0 end)
+local genMin = Instance.new("TextBox")
+genMin.Size = UDim2.new(1, 0, 1, 0)
+genMin.PlaceholderText = "Enter minimum Generation (≥)"
+genMin.Text = ""
+genMin.TextColor3 = Color3.new(0,0,0)
+genMin.Font = Enum.Font.SourceSans
+genMin.TextSize = 14
+genMin.Parent = genRow
 
--- Generation Input
-local generationInput = Instance.new("TextBox")
-generationInput.Size = UDim2.new(1, 0, 0, 30)
-generationInput.PlaceholderText = "Minimum generation (e.g., 1000)"
-generationInput.Text = ""
-generationInput.NumbersOnly = true
-generationInput.BackgroundColor3 = Color3.new(1,1,1)
-generationInput.TextColor3 = Color3.new(0,0,0)
-generationInput.Font = Enum.Font.SourceSans
-generationInput.TextSize = 14
-generationInput.Parent = inputContainer
-generationInput.Visible = false
-generationInput.FocusLost:Connect(function() searchInputs.Generation = tonumber(generationInput.Text) or 0 end)
+-- Find & lock button
+local findBtn = Instance.new("TextButton")
+findBtn.Size = UDim2.new(1, -20, 0, 26)
+findBtn.Position = UDim2.new(0, 10, 0, 205)
+findBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+findBtn.TextColor3 = Color3.new(1, 1, 1)
+findBtn.Font = Enum.Font.SourceSansBold
+findBtn.TextSize = 14
+findBtn.Text = "Find & Lock Nearest Match"
+findBtn.Parent = frame
 
--- Function to switch input modes
-local modeUIs = {Name = nameInput, Rarity = rarityFrame, Price = priceInput, Generation = generationInput}
-local function setMode(newMode)
-    searchMode = newMode
-    for mode, ui in pairs(modeUIs) do
-        ui.Visible = (mode == newMode)
-    end
-    for _, btn in ipairs(modeButtonsFrame:GetChildren()) do
-        if btn:IsA("TextButton") then
-            btn.BackgroundColor3 = (btn.Name == newMode) and Color3.fromRGB(80, 80, 200) or Color3.fromRGB(80, 80, 80)
-        end
-    end
-end
-
--- Create mode buttons
-for _, modeName in ipairs({"Name", "Rarity", "Price", "Generation"}) do
-    local btn = Instance.new("TextButton")
-    btn.Name = modeName
-    btn.Size = UDim2.new(0, 70, 1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 14
-    btn.Text = modeName
-    btn.Parent = modeButtonsFrame
-    btn.MouseButton1Click:Connect(function() setMode(modeName) end)
-end
-
--- Populate rarity buttons
-local rarityButtons = {}
-for _, rarity in ipairs(ALL_RARITIES) do
-    local btn = Instance.new("TextButton")
-    btn.Name = rarity
-    btn.Text = rarity
-    btn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.SourceSans
-    btn.TextSize = 12
-    btn.Parent = rarityFrame
-    table.insert(rarityButtons, btn)
-    btn.MouseButton1Click:Connect(function()
-        searchInputs.Rarity = rarity
-        for _, b in ipairs(rarityButtons) do
-            b.BackgroundColor3 = Color3.fromRGB(80,80,80)
-        end
-        btn.BackgroundColor3 = Color3.fromRGB(80, 80, 200)
-    end)
-end
-setMode("Name") -- Initialize default view
-
--- Scroll frame for animal list
+-- Scroll list (matches)
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -10, 1, -265)
-scrollFrame.Position = UDim2.new(0, 5, 0, 260)
-scrollFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
+scrollFrame.Size = UDim2.new(1, -20, 1, -265)
+scrollFrame.Position = UDim2.new(0, 10, 0, 235)
+scrollFrame.BackgroundTransparency = 1
 scrollFrame.ScrollBarThickness = 6
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 scrollFrame.Parent = frame
@@ -468,7 +257,22 @@ listLayout.Padding = UDim.new(0, 5)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = scrollFrame
 
--- Keybind toggle logic
+-- Mode switching updates visible inputs
+local function updateInputsVisibility()
+	local mode = modes[currentModeIndex]
+	nameBtn.Visible = (mode == "Display Name")
+	priceRow.Visible = (mode == "Price ≥")
+	genRow.Visible   = (mode == "Generation ≥")
+end
+modeBtn.MouseButton1Click:Connect(function()
+	currentModeIndex = currentModeIndex % #modes + 1
+	modeBtn.Text = "Mode: " .. modes[currentModeIndex]
+	updateInputsVisibility()
+	updateDisplay()
+end)
+updateInputsVisibility()
+
+-- ===== KEYBIND TOGGLE =====
 local currentKeyCode = Enum.KeyCode.RightShift
 local function parseKeyCode(txt)
 	if Enum.KeyCode[txt] then return Enum.KeyCode[txt] end
@@ -480,19 +284,20 @@ keyBox.FocusLost:Connect(function()
 	local code = parseKeyCode(keyBox.Text)
 	if code then
 		currentKeyCode = code
-		keyBox.TextColor3 = Color3.fromRGB(0, 150, 0)
+		keyBox.TextColor3 = Color3.new(0, 0.4, 0)
 	else
 		keyBox.TextColor3 = Color3.fromRGB(200, 0, 0)
 	end
 end)
 UIS.InputBegan:Connect(function(input, gpe)
-	if gpe or UIS:GetFocusedTextBox() then return end
+	if gpe then return end
+	if UIS:GetFocusedTextBox() then return end
 	if input.KeyCode == currentKeyCode then
 		gui.Enabled = not gui.Enabled
 	end
 end)
 
--- === Core logic: display, pathfind, and buy ===
+-- ===== CORE: pathfinding & prompts =====
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local PathfindingService = game:GetService("PathfindingService")
@@ -506,9 +311,6 @@ local function getCharParts()
 	return char, hrp, hum
 end
 
-local lastTarget -- current animal instance we’re chasing
-
--- ==== ProximityPrompt trigger + hold-E helpers ====
 local holdingE = false
 local function holdE(seconds)
 	if holdingE then return end
@@ -521,47 +323,149 @@ local function holdE(seconds)
 	holdingE = false
 end
 
--- Pathfind toward a moving target
-local path = PathfindingService:CreatePath({ AgentRadius = 2, AgentHeight = 5, AgentCanJump = true })
+local function triggerNearbyPrompt(maxRadius)
+	local _, hrp = getCharParts()
+	if not hrp then return end
+	local radius = maxRadius or 15
+	for _, d in ipairs(workspace:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then
+			local adornee = d.Parent
+			local part = adornee and (adornee:IsA("BasePart") and adornee or adornee:FindFirstChildOfClass("BasePart"))
+			if part and (part.Position - hrp.Position).Magnitude <= radius then
+				pcall(function() fireproximityprompt(d) end)
+			end
+		end
+	end
+end
+
+-- Pathfinding (repath)
+local path = PathfindingService:CreatePath({
+	AgentRadius = 2,
+	AgentHeight = 5,
+	AgentCanJump = true
+})
 local lastPathTime = 0
+local lastTarget
 local function moveToTarget(targetModel)
-	local char, hrp, hum = getCharParts()
-	if not hrp or not hum or not targetModel or not targetModel.Parent or not targetModel.PrimaryPart then return end
-
-	if tick() - lastPathTime < 0.75 then return end
-	lastPathTime = tick()
-
+	local _, hrp, hum = getCharParts()
+	if not hrp or not hum or not targetModel or not targetModel.Parent then return end
+	if not targetModel.PrimaryPart then return end
+	local now = tick()
+	if now - lastPathTime < 0.75 then return end
+	lastPathTime = now
 	local targetPos = targetModel.PrimaryPart.Position
-	path:ComputeAsync(hrp.Position, targetPos)
+	local ok = pcall(function() path:ComputeAsync(hrp.Position, targetPos) end)
+	if not ok then return end
 	if path.Status ~= Enum.PathStatus.Success then
 		hum:MoveTo(targetPos)
 		return
 	end
-
-	local waypoints = path:GetWaypoints()
-	for i, wp in ipairs(waypoints) do
-        if i > 1 then -- Skip the first waypoint as we are already there
-            if not targetModel.Parent or not gui.Enabled or not autoEnabled then break end
-            if wp.Action == Enum.PathWaypointAction.Jump then hum.Jump = true end
-            hum:MoveTo(wp.Position)
-            hum.MoveToFinished:Wait(0.5) -- Add a timeout
-        end
+	for _, wp in ipairs(path:GetWaypoints()) do
+		if not targetModel.Parent or not gui.Enabled or not autoEnabled then break end
+		if wp.Action == Enum.PathWaypointAction.Jump then hum.Jump = true end
+		hum:MoveTo(wp.Position)
+		hum.MoveToFinished:Wait()
 	end
 end
 
--- UI list update
-local function updateDisplayList(animals)
+-- ===== MATCHING / FILTERING =====
+local function getAnimalsFolder()
+	return workspace:FindFirstChild(RENDERED_FOLDER_NAME)
+end
+
+local function nearestOf(list)
+	local _, hrp = getCharParts()
+	if not hrp then return nil end
+	local best, bestDist
+	for _, m in ipairs(list) do
+		if m.PrimaryPart then
+			local d = (m.PrimaryPart.Position - hrp.Position).Magnitude
+			if not bestDist or d < bestDist then
+				best, bestDist = m, d
+			end
+		end
+	end
+	return best
+end
+
+-- Returns the Brainrot data by model.Name (tries DisplayName first, then key)
+local function getDataForModel(modelName)
+	return ByDisplay[modelName] or ByKey[modelName]
+end
+
+local function collectMatches()
+	local folder = getAnimalsFolder()
+	local matches = {}
+	if not folder then return matches end
+
+	local mode = modes[currentModeIndex]
+	local wantedDisplay = (#Brainrots > 0) and Brainrots[nameIndex].DisplayName or nil
+	local pMin = tonumber(priceMin.Text)
+	local gMin = tonumber(genMin.Text)
+
+	for _, model in ipairs(folder:GetChildren()) do
+		if model:IsA("Model") then
+			local data = getDataForModel(model.Name)
+			if data then
+				local keep = false
+				if mode == "Display Name" then
+					keep = (model.Name == wantedDisplay)
+				elseif mode == "Price ≥" then
+					keep = (data.Price ~= nil and pMin ~= nil and data.Price >= pMin)
+				elseif mode == "Generation ≥" then
+					keep = (data.Generation ~= nil and gMin ~= nil and data.Generation >= gMin)
+				end
+				if keep then table.insert(matches, model) end
+			end
+		end
+	end
+
+	return matches
+end
+
+-- ===== UI: show matches =====
+local function clearMatches()
 	for _, child in ipairs(scrollFrame:GetChildren()) do
 		if child:IsA("TextLabel") then child:Destroy() end
 	end
+end
 
-	local totalHeight = 0
-	for _, animal in ipairs(animals) do
-		local pos = animal.PrimaryPart and animal.PrimaryPart.Position or Vector3.new()
-		local info = string.format("%s | Pos: (%d, %d)", animal.Name, pos.X, pos.Z)
+function updateDisplay()
+	clearMatches()
+	local folder = getAnimalsFolder()
+	if not folder then
+		local lab = Instance.new("TextLabel")
+		lab.Size = UDim2.new(1, -10, 0, 20)
+		lab.BackgroundTransparency = 1
+		lab.Text = RENDERED_FOLDER_NAME .. " not found"
+		lab.TextColor3 = Color3.new(1, 1, 1)
+		lab.Font = Enum.Font.SourceSans
+		lab.TextSize = 14
+		lab.TextXAlignment = Enum.TextXAlignment.Left
+		lab.Parent = scrollFrame
+		scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 25)
+		warningLabel.Visible = false
+		return
+	end
+
+	local matches = collectMatches()
+	local total = 0
+	for _, model in ipairs(matches) do
+		local data = getDataForModel(model.Name)
+		local info
+		if data then
+			info = string.format("%s | %s | $%s | gen: %s",
+				data.DisplayName,
+				tostring(data.Rarity or "?"),
+				tostring(data.Price or "?"),
+				tostring(data.Generation or "?")
+			)
+		else
+			info = model.Name
+		end
 
 		local label = Instance.new("TextLabel")
-		label.Size = UDim2.new(1, 0, 0, 20)
+		label.Size = UDim2.new(1, -10, 0, 20)
 		label.BackgroundTransparency = 1
 		label.Text = info
 		label.TextColor3 = Color3.new(1, 1, 1)
@@ -569,97 +473,72 @@ local function updateDisplayList(animals)
 		label.TextSize = 14
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.Parent = scrollFrame
-		totalHeight = totalHeight + 25
+		total += 25
 	end
-	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, total)
+	warningLabel.Visible = (#matches > 0)
+	warningLabel.Text = (#matches > 0) and ("Matches: "..#matches) or ""
 end
 
--- Core targeting function
-local function findMatchingAnimal(allAnimals)
-    for _, animal in ipairs(allAnimals) do
-        local data = animalLibrary[animal.Name]
-        if data then
-            local match = false
-            if searchMode == "Name" and searchInputs.Name ~= "" then
-                if string.find(string.lower(animal.Name), string.lower(searchInputs.Name), 1, true) then
-                    match = true
-                end
-            elseif searchMode == "Rarity" then
-                if data.Rarity == searchInputs.Rarity then
-                    match = true
-                end
-            elseif searchMode == "Price" then
-                if data.Price and data.Price >= searchInputs.Price then
-                    match = true
-                end
-            elseif searchMode == "Generation" then
-                 if data.Generation and data.Generation >= searchInputs.Generation then
-                    match = true
-                end
-            end
-
-            if match then return animal end
-        end
-    end
-    return nil
+-- Live refresh on numeric inputs
+local function onAnyChange()
+	updateDisplay()
 end
+priceMin:GetPropertyChangedSignal("Text"):Connect(onAnyChange)
+genMin:GetPropertyChangedSignal("Text"):Connect(onAnyChange)
 
--- Main update loop
-RunService.Heartbeat:Connect(function()
-    if not gui.Enabled then return end
+-- Initial render
+updateDisplay()
 
-    local animalsFolder = workspace:FindFirstChild("RenderedMovingAnimals")
-    if not animalsFolder then
-        statusLabel.Text = "Error: Animal folder not found!"
-        return
-    end
-
-    local allAnimals = animalsFolder:GetChildren()
-    updateDisplayList(allAnimals)
-
-    if autoEnabled then
-        local target = findMatchingAnimal(allAnimals)
-        lastTarget = target
-
-        if lastTarget then
-            statusLabel.Text = "Target found: " .. lastTarget.Name
-            statusLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-        else
-            statusLabel.Text = "Searching for matching animal..."
-            statusLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-        end
-    else
-        lastTarget = nil
-        statusLabel.Text = "Auto-buy is disabled."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 0)
-    end
+-- Find & lock nearest match
+findBtn.MouseButton1Click:Connect(function()
+	local matches = collectMatches()
+	if #matches == 0 then
+		warningLabel.Visible = true
+		warningLabel.Text = "No matches."
+		return
+	end
+	local target = nearestOf(matches)
+	if target then
+		lastTarget = target
+		warningLabel.Visible = true
+		warningLabel.Text = "Locked: " .. target.Name
+	else
+		warningLabel.Visible = true
+		warningLabel.Text = "No target."
+	end
 end)
 
--- Follow loop (movement)
+-- Periodic refresh
+RunService.Heartbeat:Connect(function()
+	if tick() % 0.5 < 0.1 then
+		updateDisplay()
+	end
+end)
+
+-- Follow loop
 task.spawn(function()
-	while task.wait(0.15) do
+	while true do
+		task.wait(0.15)
 		if gui.Enabled and autoEnabled and lastTarget then
 			moveToTarget(lastTarget)
 		end
 	end
 end)
 
--- E-hold cycle while close to the target
+-- Hold E loop when close
 task.spawn(function()
-	while task.wait(0.2) do
+	while true do
+		task.wait(0.2)
 		if not (gui.Enabled and autoEnabled and lastTarget) then
-			if holdingE then
-				pcall(function() VIM:SendKeyEvent(false, Enum.KeyCode.E, false, nil) end)
-				holdingE = false
-			end
+			if holdingE then pcall(function() VIM:SendKeyEvent(false, Enum.KeyCode.E, false, nil) end); holdingE=false end
 			continue
 		end
-
 		local _, hrp = getCharParts()
 		if not hrp or not lastTarget.Parent or not lastTarget.PrimaryPart then continue end
-
 		local dist = (lastTarget.PrimaryPart.Position - hrp.Position).Magnitude
-		if dist <= 12 then
+		if dist <= 10 then
+			triggerNearbyPrompt(15)
 			holdE(4.05)
 		end
 	end
