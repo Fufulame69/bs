@@ -175,40 +175,34 @@ end
 
 local lastTarget -- current animal instance we’re chasing
 
--- Attempts a buy near the target:
--- 1) Prefer any nearby ProximityPrompt (esp. with KeyCode E)
--- 2) Otherwise simulate E key press
-local function tryBuy(targetPos)
-	local char, hrp, hum = getCharParts()
+-- ==== NEW: prompt trigger + hold-E helpers ====
+local function triggerNearbyPrompt(maxRadius)
+	local char, hrp = getCharParts()
 	if not hrp then return end
-
-	-- Check for nearby ProximityPrompts (within ~15 studs)
-	local root = workspace
-	local radius = 15
-	for _, descendant in ipairs(root:GetDescendants()) do
-		if descendant:IsA("ProximityPrompt") then
-			local adornee = descendant.Parent
-			local adorneePos
-			if adornee and adornee:IsA("BasePart") then
-				adorneePos = adornee.Position
-			elseif adornee and adornee:FindFirstChildOfClass("BasePart") then
-				adorneePos = adornee:FindFirstChildOfClass("BasePart").Position
-			end
-			if adorneePos and (adorneePos - hrp.Position).Magnitude <= radius then
-				-- Prefer prompts that use E, but trigger any if close enough
-				pcall(function() fireproximityprompt(descendant) end)
-				return
+	local radius = maxRadius or 15
+	for _, d in ipairs(workspace:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then
+			local adornee = d.Parent
+			local part = adornee and (adornee:IsA("BasePart") and adornee or adornee:FindFirstChildOfClass("BasePart"))
+			if part and (part.Position - hrp.Position).Magnitude <= radius then
+				pcall(function() fireproximityprompt(d) end)
 			end
 		end
 	end
+end
 
-	-- Fallback: simulate E press
+local holdingE = false
+local function holdE(seconds)
+	if holdingE then return end
+	holdingE = true
 	pcall(function()
 		VIM:SendKeyEvent(true, Enum.KeyCode.E, false, nil)
-		task.wait(0.05)
+		task.wait(seconds or 4.05) -- HOLD E FOR ~4s
 		VIM:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
 	end)
+	holdingE = false
 end
+-- ===============================================
 
 -- Pathfind toward a moving target; re-path as the animal moves
 local path = PathfindingService:CreatePath({
@@ -238,18 +232,13 @@ local function moveToTarget(targetModel)
 	end
 
 	local waypoints = path:GetWaypoints()
-	for i, wp in ipairs(waypoints) do
+	for _, wp in ipairs(waypoints) do
 		if not targetModel.Parent or not gui.Enabled or not autoEnabled then break end
 		if wp.Action == Enum.PathWaypointAction.Jump then
 			hum.Jump = true
 		end
 		hum:MoveTo(wp.Position)
 		hum.MoveToFinished:Wait()
-	end
-
-	-- If close, attempt buy
-	if (targetPos - hrp.Position).Magnitude <= 8 then
-		tryBuy(targetPos)
 	end
 end
 
@@ -280,7 +269,7 @@ local function updateDisplay()
 	local totalHeight = 0
 	local searchTerm = string.lower(searchBox.Text)
 	local foundAny = false
-	local candidate -- prefer exact/partial match among children
+	local candidate
 
 	for _, animal in ipairs(animalsFolder:GetChildren()) do
 		local pos = Vector3.new(0,0,0)
@@ -302,7 +291,6 @@ local function updateDisplay()
 			local n = string.lower(animal.Name)
 			if string.find(n, searchTerm, 1, true) then
 				foundAny = true
-				-- choose the first matching animal (or keep existing target if still valid)
 				if not candidate then candidate = animal end
 				if lastTarget == animal then candidate = animal end
 			end
@@ -313,7 +301,6 @@ local function updateDisplay()
 	warningLabel.Visible = foundAny
 	warningLabel.Text = foundAny and "animal found!" or ""
 
-	-- Update current target
 	if foundAny then
 		lastTarget = candidate
 	else
@@ -331,16 +318,43 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
--- Follow loop (separate, lightweight)
+-- Follow loop (movement)
 task.spawn(function()
 	while true do
 		task.wait(0.15)
 		if gui.Enabled and autoEnabled and lastTarget then
-			-- If the target moved or time passed, re-path
 			moveToTarget(lastTarget)
 		end
 	end
 end)
+
+-- ==== NEW: 4s E-hold cycle while close to the target ====
+task.spawn(function()
+	while true do
+		task.wait(0.2)
+		if not (gui.Enabled and autoEnabled and lastTarget) then
+			-- safety: make sure key is up if toggled off
+			if holdingE then
+				pcall(function() VIM:SendKeyEvent(false, Enum.KeyCode.E, false, nil) end)
+				holdingE = false
+			end
+			continue
+		end
+
+		local _, hrp = getCharParts()
+		if not hrp or not lastTarget.Parent or not lastTarget.PrimaryPart then continue end
+
+		local dist = (lastTarget.PrimaryPart.Position - hrp.Position).Magnitude
+		if dist <= 10 then
+			-- Try prompt (if game uses ProximityPrompts)
+			triggerNearbyPrompt(15)
+			-- Hold E for ~4 seconds (debounced)
+			holdE(4.05)
+			-- Immediately loop again; if the animal's still around, it will keep holding in lapses
+		end
+	end
+end)
+-- =========================================================
 
 -- Close button
 local closeBtn = Instance.new("TextButton")
