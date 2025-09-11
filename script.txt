@@ -38,8 +38,8 @@ gui.ResetOnSpawn = false
 gui.Parent = game:GetService("CoreGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 340, 0, 560)
-frame.Position = UDim2.new(0.5, -170, 0.5, -280)
+frame.Size = UDim2.new(0, 340, 0, 600)
+frame.Position = UDim2.new(0.5, -170, 0.5, -300)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -182,23 +182,22 @@ modeBtn.Parent = frame
 
 -- ===== INPUTS PER MODE =====
 
--- DisplayName cycler
-local nameIndex = 1
-local nameBtn = Instance.new("TextButton")
-nameBtn.Size = UDim2.new(1, -20, 0, 24)
-nameBtn.Position = UDim2.new(0, 10, 0, 175)
-nameBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-nameBtn.TextColor3 = Color3.new(1,1,1)
-nameBtn.Font = Enum.Font.SourceSans
-nameBtn.TextSize = 14
-nameBtn.Text = (#Brainrots > 0) and ("Display: " .. Brainrots[nameIndex].DisplayName) or "No brainrots"
-nameBtn.Parent = frame
-nameBtn.MouseButton1Click:Connect(function()
-	if #Brainrots == 0 then return end
-	nameIndex = nameIndex % #Brainrots + 1
-	nameBtn.Text = "Display: " .. Brainrots[nameIndex].DisplayName
-	updateDisplay()
-end)
+-- NEW: Name TextBox (replaces cycler)
+local nameRow = Instance.new("Frame")
+nameRow.Size = UDim2.new(1, -20, 0, 24)
+nameRow.Position = UDim2.new(0, 10, 0, 175)
+nameRow.BackgroundTransparency = 1
+nameRow.Parent = frame
+
+local nameBox = Instance.new("TextBox")
+nameBox.Size = UDim2.new(1, 0, 1, 0)
+nameBox.PlaceholderText = "Type animal name (partial ok)"
+nameBox.Text = ""
+nameBox.TextColor3 = Color3.new(0,0,0)
+nameBox.Font = Enum.Font.SourceSans
+nameBox.TextSize = 14
+nameBox.ClearTextOnFocus = false
+nameBox.Parent = nameRow
 
 -- Price ≥ threshold
 local priceRow = Instance.new("Frame")
@@ -243,10 +242,26 @@ findBtn.TextSize = 14
 findBtn.Text = "Find & Lock Nearest Match"
 findBtn.Parent = frame
 
+-- NEW: Constant find toggle
+local constBtn = Instance.new("TextButton")
+constBtn.Size = UDim2.new(1, -20, 0, 24)
+constBtn.Position = UDim2.new(0, 10, 0, 235)
+constBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+constBtn.TextColor3 = Color3.new(1, 1, 1)
+constBtn.Font = Enum.Font.SourceSansBold
+constBtn.TextSize = 14
+constBtn.Text = "Constant find: OFF"
+constBtn.Parent = frame
+local constantFindEnabled = false
+constBtn.MouseButton1Click:Connect(function()
+	constantFindEnabled = not constantFindEnabled
+	constBtn.Text = "Constant find: " .. (constantFindEnabled and "ON" or "OFF")
+end)
+
 -- Scroll list (matches)
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -20, 1, -265)
-scrollFrame.Position = UDim2.new(0, 10, 0, 235)
+scrollFrame.Size = UDim2.new(1, -20, 1, -305) -- shifted down to make room for constBtn
+scrollFrame.Position = UDim2.new(0, 10, 0, 265)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.ScrollBarThickness = 6
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -260,7 +275,7 @@ listLayout.Parent = scrollFrame
 -- Mode switching updates visible inputs
 local function updateInputsVisibility()
 	local mode = modes[currentModeIndex]
-	nameBtn.Visible = (mode == "Display Name")
+	nameRow.Visible  = (mode == "Display Name")
 	priceRow.Visible = (mode == "Price ≥")
 	genRow.Visible   = (mode == "Generation ≥")
 end
@@ -399,24 +414,29 @@ local function collectMatches()
 	if not folder then return matches end
 
 	local mode = modes[currentModeIndex]
-	local wantedDisplay = (#Brainrots > 0) and Brainrots[nameIndex].DisplayName or nil
+	local q = string.lower(nameBox.Text or "")
 	local pMin = tonumber(priceMin.Text)
 	local gMin = tonumber(genMin.Text)
 
 	for _, model in ipairs(folder:GetChildren()) do
 		if model:IsA("Model") then
-			local data = getDataForModel(model.Name)
-			if data then
-				local keep = false
-				if mode == "Display Name" then
-					keep = (model.Name == wantedDisplay)
-				elseif mode == "Price ≥" then
-					keep = (data.Price ~= nil and pMin ~= nil and data.Price >= pMin)
-				elseif mode == "Generation ≥" then
-					keep = (data.Generation ~= nil and gMin ~= nil and data.Generation >= gMin)
+			local data = getDataForModel(model.Name) or {}
+			local keep = false
+			if mode == "Display Name" then
+				if #q > 0 then
+					local nameL = string.lower(model.Name)
+					local dispL = string.lower(tostring(data.DisplayName or model.Name))
+					-- case-insensitive substring match on either name
+					keep = (string.find(nameL, q, 1, true) ~= nil) or (string.find(dispL, q, 1, true) ~= nil)
+				else
+					keep = false
 				end
-				if keep then table.insert(matches, model) end
+			elseif mode == "Price ≥" then
+				keep = (data.Price ~= nil and pMin ~= nil and data.Price >= pMin)
+			elseif mode == "Generation ≥" then
+				keep = (data.Generation ~= nil and gMin ~= nil and data.Generation >= gMin)
 			end
+			if keep then table.insert(matches, model) end
 		end
 	end
 
@@ -455,7 +475,7 @@ function updateDisplay()
 		local info
 		if data then
 			info = string.format("%s | %s | $%s | gen: %s",
-				data.DisplayName,
+				data.DisplayName or model.Name,
 				tostring(data.Rarity or "?"),
 				tostring(data.Price or "?"),
 				tostring(data.Generation or "?")
@@ -480,17 +500,18 @@ function updateDisplay()
 	warningLabel.Text = (#matches > 0) and ("Matches: "..#matches) or ""
 end
 
--- Live refresh on numeric inputs
+-- Live refresh on inputs
 local function onAnyChange()
 	updateDisplay()
 end
 priceMin:GetPropertyChangedSignal("Text"):Connect(onAnyChange)
 genMin:GetPropertyChangedSignal("Text"):Connect(onAnyChange)
+nameBox:GetPropertyChangedSignal("Text"):Connect(onAnyChange)
 
 -- Initial render
 updateDisplay()
 
--- Find & lock nearest match
+-- Find & lock nearest match (one-shot)
 findBtn.MouseButton1Click:Connect(function()
 	local matches = collectMatches()
 	if #matches == 0 then
@@ -509,10 +530,31 @@ findBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Periodic refresh
+-- Periodic refresh of list
 RunService.Heartbeat:Connect(function()
 	if tick() % 0.5 < 0.1 then
 		updateDisplay()
+	end
+end)
+
+-- NEW: Constant find loop (keeps updating lastTarget automatically)
+task.spawn(function()
+	while true do
+		task.wait(0.2)
+		if gui.Enabled and constantFindEnabled then
+			local matches = collectMatches()
+			if #matches > 0 then
+				local target = nearestOf(matches)
+				if target ~= lastTarget then
+					lastTarget = target
+					warningLabel.Visible = true
+					warningLabel.Text = "Locked (auto): " .. target.Name
+				end
+			else
+				-- No current matches; wait for next spawn
+				lastTarget = nil
+			end
+		end
 	end
 end)
 
