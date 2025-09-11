@@ -1,82 +1,186 @@
--- Load the Rayfield library
+-- Rayfield-powered "Rendered Moving Animals" viewer
+-- Requires an executor with HttpGet enabled
+
+-- Load Rayfield
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Create the main window
+-- === Window ===
 local Window = Rayfield:CreateWindow({
-   Name = "Animal Info Display",
-   LoadingTitle = "Animal Information",
-   LoadingSubtitle = "Loading Data...",
-   ToggleUIKeybind = "End", -- You can change this keybind
+    Name = "Animal Info Display",
+    Icon = "rewind",                 -- Lucide icon example per docs
+    LoadingTitle = "Rayfield Interface Suite",
+    LoadingSubtitle = "by Sirius",
+    ShowText = "Rayfield",
+    Theme = "Default",
+
+    ToggleUIKeybind = "K",
+
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "AnimalViewer",
+        FileName = "RenderedMovingAnimals"
+    },
+
+    Discord = { Enabled = false },
+    KeySystem = false
 })
 
--- Create a tab to hold the information
-local AnimalTab = Window:CreateTab("Rendered Animals", "footprints") -- Using a lucide icon
+-- === Tab & Section ===
+local Tab = Window:CreateTab("Animals", "rewind")
+local Section = Tab:CreateSection("Rendered Moving Animals")
 
--- Create a paragraph element that will display all the animal data.
--- We will update this element instead of creating and destroying labels.
-local InfoParagraph = AnimalTab:CreateParagraph({
-    Title = "Live Animal Data", 
-    Content = "Searching for animals..."
-})
+-- A label to show status (count / errors)
+local StatusLabel = Tab:CreateLabel("Status: Waiting...")
 
--- Function to update the display with the latest animal info
-local function updateDisplay()
-    local animalsFolder = workspace:FindFirstChild("RenderedMovingAnimals")
-    local animalCount = 0
-    local contentString = ""
+-- We'll maintain one Paragraph per animal (easier multi-line + auto-size)
+-- Map of instance -> Paragraph UI
+local AnimalParagraphs = {}
 
-    -- Check if the folder exists and has animals in it
-    if not animalsFolder or #animalsFolder:GetChildren() == 0 then
-        contentString = "No rendered moving animals found in workspace."
-    else
-        local allAnimalInfo = {}
-        animalCount = #animalsFolder:GetChildren()
+-- === Settings (with config flags so they persist) ===
+local RefreshRate = 0.5
+local ShowIDs = true
+local AutoRefreshEnabled = true
 
-        for _, animal in ipairs(animalsFolder:GetChildren()) do
-            -- Safely get position, default to (0,0,0) if no primary part
-            local pos = animal.PrimaryPart and animal.PrimaryPart.Position or Vector3.new(0, 0, 0)
-            
-            -- Safely get a number from the debug ID as in the original script
-            local debugIdNum = 0
-            local success, result = pcall(function()
-                debugIdNum = animal:GetDebugId(100):sub(1, 4):byte(1)
-            end)
-            if not success or not debugIdNum then
-                debugIdNum = 0 -- Fallback if it fails
-            end
-
-            -- Format the string for this animal
-            local infoLine = string.format(
-                "%s [%d] - Pos: (%.1f, %.1f, %.1f)",
-                animal.Name,
-                debugIdNum,
-                pos.X,
-                pos.Y,
-                pos.Z
-            )
-            table.insert(allAnimalInfo, infoLine)
-        end
-        -- Join all the individual animal lines into one string
-        contentString = table.concat(allAnimalInfo, "\n")
+local ToggleAuto = Tab:CreateToggle({
+    Name = "Auto Refresh",
+    CurrentValue = true,
+    Flag = "AutoRefreshToggle",
+    Callback = function(v)
+        AutoRefreshEnabled = v
     end
+})
 
-    -- Update the paragraph with the new title and content
-    InfoParagraph:Set({
-        Title = "Live Animal Data (" .. animalCount .. ")", 
-        Content = contentString
-    })
+local SliderRate = Tab:CreateSlider({
+    Name = "Refresh Rate",
+    Range = {0.1, 5},
+    Increment = 0.1,
+    Suffix = "sec",
+    CurrentValue = 0.5,
+    Flag = "RefreshRateSlider",
+    Callback = function(v)
+        RefreshRate = v
+    end
+})
+
+local ToggleIDs = Tab:CreateToggle({
+    Name = "Show Instance IDs",
+    CurrentValue = true,
+    Flag = "ShowIDsToggle",
+    Callback = function(v)
+        ShowIDs = v
+    end
+})
+
+local RefreshBtn = Tab:CreateButton({
+    Name = "Refresh Now",
+    Callback = function()
+        task.spawn(function()
+            updateDisplay()
+        end)
+    end
+})
+
+-- === Utilities ===
+local function fmtVec3(vec3)
+    return string.format("(%.1f, %.1f, %.1f)", vec3.X, vec3.Y, vec3.Z)
 end
 
--- Create a loop that runs the update function every 0.5 seconds
-task.spawn(function()
-    -- The `while true do` loop will run forever until the script is stopped.
-    -- The `Window.Visible` check ensures it only updates when the UI is actually open.
-    while true do
-        if Window.Visible then
-            -- We wrap the update function in a pcall (protected call) to prevent
-            -- any errors from stopping the entire loop.
-            pcall(updateDisplay)
+local function animalInfo(animal)
+    local idStr = ""
+    if ShowIDs then
+        -- Robust ID: use GetDebugId if available, else fallback
+        local ok, id = pcall(function()
+            return animal:GetDebugId(100)
+        end)
+        if ok and id then
+            idStr = " [" .. tostring(id):sub(1, 8) .. "]"
         end
-        task.wait(0.5)
+    end
+    local pp = animal.PrimaryPart
+    local pos = pp and pp.Position or Vector3.new()
+    return string.format("%s%s\nPos: %s", animal.Name, idStr, fmtVec3(pos))
+end
+
+local function clearMissingParagraphs(currentSet)
+    -- Remove UI paragraphs for animals that no longer exist
+    for instanceRef, para in pairs(AnimalParagraphs) do
+        if not currentSet[instanceRef] then
+            -- Destroy paragraph UI by resetting to empty and dropping ref
+            para:Set("Removed", nil, nil, true)
+            AnimalParagraphs[instanceRef] = nil
+        end
+    end
+end
+
+-- === Core updater ===
+function updateDisplay()
+    local container = workspace:FindFirstChild("RenderedMovingAnimals")
+    if not container then
+        StatusLabel:Set("Status: 'RenderedMovingAnimals' not found")
+        -- Also nuke any previous paragraphs since container is missing
+        clearMissingParagraphs({})
+        return
+    end
+
+    local children = container:GetChildren()
+    StatusLabel:Set(("Status: %d animal%s"):format(#children, #children == 1 and "" or "s"))
+
+    -- Track which ones we saw this frame
+    local seen = {}
+
+    for _, animal in ipairs(children) do
+        seen[animal] = true
+        local para = AnimalParagraphs[animal]
+
+        if not para then
+            -- Create a new paragraph for this animal
+            para = Tab:CreateParagraph({
+                Title = animal.Name,
+                Content = animalInfo(animal)
+            })
+            AnimalParagraphs[animal] = para
+
+            -- Clean up mapping if the instance is removed from the game
+            animal.AncestryChanged:Connect(function(_, parent)
+                if parent == nil and AnimalParagraphs[animal] then
+                    AnimalParagraphs[animal]:Set("Removed", "Deleted from workspace")
+                    AnimalParagraphs[animal] = nil
+                end
+            end)
+        else
+            -- Update existing paragraph
+            para:Set({ Title = animal.Name, Content = animalInfo(animal) })
+        end
+    end
+
+    clearMissingParagraphs(seen)
+end
+
+-- Initial draw
+updateDisplay()
+
+-- === Auto refresh loop using Heartbeat with dt accumulator ===
+local RunService = game:GetService("RunService")
+local accum = 0
+RunService.Heartbeat:Connect(function(dt)
+    if not AutoRefreshEnabled then return end
+    accum += dt
+    if accum >= RefreshRate then
+        accum = 0
+        updateDisplay()
     end
 end)
+
+-- Optional: quick toast so users know where to toggle the UI
+Rayfield:Notify({
+    Title = "Animal Viewer",
+    Content = "Press 'K' to toggle the UI",
+    Duration = 4.5,
+    Image = "rewind"
+})
+
+-- Load saved config (restores flags like AutoRefresh, RefreshRate, ShowIDs)
+Rayfield:LoadConfiguration()
