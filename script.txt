@@ -2,21 +2,20 @@
 local gui = Instance.new("ScreenGui")
 gui.Name = "AnimalInfoDisplay"
 gui.ResetOnSpawn = false
-gui.Parent = game:GetService("CoreGui") -- Use CoreGui for executor compatibility
+gui.Parent = game:GetService("CoreGui") -- executor-friendly
 
 -- Create the frame
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 480)
-frame.Position = UDim2.new(0.5, -150, 0.5, -240)
+frame.Size = UDim2.new(0, 300, 0, 520)
+frame.Position = UDim2.new(0.5, -150, 0.5, -260)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Parent = gui
 
--- ===== DRAGGING (custom, non-deprecated) =====
+-- ===== DRAGGING (custom) =====
 local UIS = game:GetService("UserInputService")
 local dragging, dragStart, startPos
-
 local function onInputBegan(input, gpe)
 	if gpe then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -25,31 +24,24 @@ local function onInputBegan(input, gpe)
 		startPos = frame.Position
 	end
 end
-
 local function onInputChanged(input, gpe)
 	if gpe then return end
 	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 		local delta = input.Position - dragStart
-		frame.Position = UDim2.new(
-			startPos.X.Scale, startPos.X.Offset + delta.X,
-			startPos.Y.Scale, startPos.Y.Offset + delta.Y
-		)
+		frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 	end
 end
-
 local function onInputEnded(input, gpe)
 	if gpe then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = false
 	end
 end
-
--- Drag from the title bar area (made below), but also allow grabbing anywhere on the frame background.
 frame.InputBegan:Connect(onInputBegan)
 frame.InputChanged:Connect(onInputChanged)
 frame.InputEnded:Connect(onInputEnded)
 
--- Create title bar
+-- Title
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundTransparency = 1
@@ -58,12 +50,11 @@ title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.SourceSansBold
 title.TextSize = 18
 title.Parent = frame
--- Also wire drag through the title (nice UX)
 title.InputBegan:Connect(onInputBegan)
 title.InputChanged:Connect(onInputChanged)
 title.InputEnded:Connect(onInputEnded)
 
--- === SEARCH BOX (your previous addition) ===
+-- Search box
 local searchBox = Instance.new("TextBox")
 searchBox.Size = UDim2.new(1, -10, 0, 25)
 searchBox.Position = UDim2.new(0, 5, 0, 35)
@@ -74,7 +65,7 @@ searchBox.Font = Enum.Font.SourceSans
 searchBox.TextSize = 14
 searchBox.Parent = frame
 
--- === KEYBIND ROW ===
+-- Keybind row
 local keyRow = Instance.new("Frame")
 keyRow.Size = UDim2.new(1, -10, 0, 25)
 keyRow.Position = UDim2.new(0, 5, 0, 65)
@@ -101,10 +92,26 @@ keyBox.Font = Enum.Font.SourceSans
 keyBox.TextSize = 14
 keyBox.Parent = keyRow
 
--- Warning label (appears if a searched animal is found)
+-- Auto-walk & buy toggle
+local autoBtn = Instance.new("TextButton")
+autoBtn.Size = UDim2.new(1, -10, 0, 24)
+autoBtn.Position = UDim2.new(0, 5, 0, 95)
+autoBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+autoBtn.TextColor3 = Color3.new(1, 1, 1)
+autoBtn.Font = Enum.Font.SourceSansBold
+autoBtn.TextSize = 14
+autoBtn.Text = "Auto-walk & buy: ON"
+autoBtn.Parent = frame
+local autoEnabled = true
+autoBtn.MouseButton1Click:Connect(function()
+	autoEnabled = not autoEnabled
+	autoBtn.Text = "Auto-walk & buy: " .. (autoEnabled and "ON" or "OFF")
+end)
+
+-- Warning label
 local warningLabel = Instance.new("TextLabel")
 warningLabel.Size = UDim2.new(1, -10, 0, 20)
-warningLabel.Position = UDim2.new(0, 5, 0, 95)
+warningLabel.Position = UDim2.new(0, 5, 0, 125)
 warningLabel.BackgroundTransparency = 1
 warningLabel.Text = ""
 warningLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
@@ -113,10 +120,10 @@ warningLabel.TextSize = 16
 warningLabel.Visible = false
 warningLabel.Parent = frame
 
--- Scroll frame (list of animals)
+-- Scroll frame
 local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -10, 1, -155)
-scrollFrame.Position = UDim2.new(0, 5, 0, 130)
+scrollFrame.Size = UDim2.new(1, -10, 1, -185)
+scrollFrame.Position = UDim2.new(0, 5, 0, 160)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.ScrollBarThickness = 6
 scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -127,18 +134,15 @@ listLayout.Padding = UDim.new(0, 5)
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Parent = scrollFrame
 
--- === TOGGLE VISIBILITY VIA KEYBIND ===
+-- Keybind toggle logic
 local currentKeyCode = Enum.KeyCode.RightShift
 local function parseKeyCode(txt)
-	-- Try exact KeyCode match first
 	if Enum.KeyCode[txt] then return Enum.KeyCode[txt] end
-	-- Try single letter/number convenience (e.g., "p" -> "P")
 	local upper = string.upper(txt)
 	if Enum.KeyCode[upper] then return Enum.KeyCode[upper] end
 	return nil
 end
-
-keyBox.FocusLost:Connect(function(enterPressed)
+keyBox.FocusLost:Connect(function()
 	local code = parseKeyCode(keyBox.Text)
 	if code then
 		currentKeyCode = code
@@ -147,27 +151,117 @@ keyBox.FocusLost:Connect(function(enterPressed)
 		keyBox.TextColor3 = Color3.fromRGB(200, 0, 0)
 	end
 end)
-
 UIS.InputBegan:Connect(function(input, gpe)
 	if gpe then return end
-	-- Don't toggle while user is typing in a TextBox
 	if UIS:GetFocusedTextBox() then return end
 	if input.KeyCode == currentKeyCode then
 		gui.Enabled = not gui.Enabled
 	end
 end)
 
--- === UPDATE LIST + SEARCH MATCH ===
-local function updateDisplay()
-	-- Clear existing labels
-	for _, child in ipairs(scrollFrame:GetChildren()) do
-		if child:IsA("TextLabel") then
-			child:Destroy()
+-- === Core logic: display, pathfind, and buy ===
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local PathfindingService = game:GetService("PathfindingService")
+local VIM = game:GetService("VirtualInputManager")
+
+local localPlayer = Players.LocalPlayer
+local function getCharParts()
+	local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	return char, hrp, hum
+end
+
+local lastTarget -- current animal instance we’re chasing
+
+-- Attempts a buy near the target:
+-- 1) Prefer any nearby ProximityPrompt (esp. with KeyCode E)
+-- 2) Otherwise simulate E key press
+local function tryBuy(targetPos)
+	local char, hrp, hum = getCharParts()
+	if not hrp then return end
+
+	-- Check for nearby ProximityPrompts (within ~15 studs)
+	local root = workspace
+	local radius = 15
+	for _, descendant in ipairs(root:GetDescendants()) do
+		if descendant:IsA("ProximityPrompt") then
+			local adornee = descendant.Parent
+			local adorneePos
+			if adornee and adornee:IsA("BasePart") then
+				adorneePos = adornee.Position
+			elseif adornee and adornee:FindFirstChildOfClass("BasePart") then
+				adorneePos = adornee:FindFirstChildOfClass("BasePart").Position
+			end
+			if adorneePos and (adorneePos - hrp.Position).Magnitude <= radius then
+				-- Prefer prompts that use E, but trigger any if close enough
+				pcall(function() fireproximityprompt(descendant) end)
+				return
+			end
 		end
 	end
 
-	local animals = workspace:FindFirstChild("RenderedMovingAnimals")
-	if not animals then
+	-- Fallback: simulate E press
+	pcall(function()
+		VIM:SendKeyEvent(true, Enum.KeyCode.E, false, nil)
+		task.wait(0.05)
+		VIM:SendKeyEvent(false, Enum.KeyCode.E, false, nil)
+	end)
+end
+
+-- Pathfind toward a moving target; re-path as the animal moves
+local path = PathfindingService:CreatePath({
+	AgentRadius = 2,
+	AgentHeight = 5,
+	AgentCanJump = true
+})
+
+local lastPathTime = 0
+local function moveToTarget(targetModel)
+	local char, hrp, hum = getCharParts()
+	if not hrp or not hum or not targetModel or not targetModel.Parent then return end
+	if not targetModel.PrimaryPart then return end
+
+	-- Recompute path at most every 0.75s
+	local now = tick()
+	if now - lastPathTime < 0.75 then return end
+	lastPathTime = now
+
+	local targetPos = targetModel.PrimaryPart.Position
+	local ok = pcall(function() path:ComputeAsync(hrp.Position, targetPos) end)
+	if not ok then return end
+	if path.Status ~= Enum.PathStatus.Success then
+		-- fallback simple MoveTo if path failed
+		hum:MoveTo(targetPos)
+		return
+	end
+
+	local waypoints = path:GetWaypoints()
+	for i, wp in ipairs(waypoints) do
+		if not targetModel.Parent or not gui.Enabled or not autoEnabled then break end
+		if wp.Action == Enum.PathWaypointAction.Jump then
+			hum.Jump = true
+		end
+		hum:MoveTo(wp.Position)
+		hum.MoveToFinished:Wait()
+	end
+
+	-- If close, attempt buy
+	if (targetPos - hrp.Position).Magnitude <= 8 then
+		tryBuy(targetPos)
+	end
+end
+
+-- UI list + found detection
+local function updateDisplay()
+	-- Clear labels
+	for _, child in ipairs(scrollFrame:GetChildren()) do
+		if child:IsA("TextLabel") then child:Destroy() end
+	end
+
+	local animalsFolder = workspace:FindFirstChild("RenderedMovingAnimals")
+	if not animalsFolder then
 		local noAnimalsLabel = Instance.new("TextLabel")
 		noAnimalsLabel.Size = UDim2.new(1, -10, 0, 20)
 		noAnimalsLabel.BackgroundTransparency = 1
@@ -179,18 +273,18 @@ local function updateDisplay()
 		noAnimalsLabel.Parent = scrollFrame
 		scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 25)
 		warningLabel.Visible = false
+		lastTarget = nil
 		return
 	end
 
 	local totalHeight = 0
 	local searchTerm = string.lower(searchBox.Text)
-	local found = false
+	local foundAny = false
+	local candidate -- prefer exact/partial match among children
 
-	for _, animal in ipairs(animals:GetChildren()) do
+	for _, animal in ipairs(animalsFolder:GetChildren()) do
 		local pos = Vector3.new(0,0,0)
-		if animal.PrimaryPart then
-			pos = animal.PrimaryPart.Position
-		end
+		if animal.PrimaryPart then pos = animal.PrimaryPart.Position end
 		local info = string.format("%s - Pos: (%.1f, %.1f, %.1f)", animal.Name, pos.X, pos.Y, pos.Z)
 
 		local label = Instance.new("TextLabel")
@@ -202,24 +296,49 @@ local function updateDisplay()
 		label.TextSize = 14
 		label.TextXAlignment = Enum.TextXAlignment.Left
 		label.Parent = scrollFrame
-
 		totalHeight = totalHeight + 25
 
-		if searchTerm ~= "" and string.find(string.lower(animal.Name), searchTerm) then
-			found = true
+		if searchTerm ~= "" then
+			local n = string.lower(animal.Name)
+			if string.find(n, searchTerm, 1, true) then
+				foundAny = true
+				-- choose the first matching animal (or keep existing target if still valid)
+				if not candidate then candidate = animal end
+				if lastTarget == animal then candidate = animal end
+			end
 		end
 	end
 
 	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
-	warningLabel.Visible = found
-	warningLabel.Text = found and "animal found!" or ""
+	warningLabel.Visible = foundAny
+	warningLabel.Text = foundAny and "animal found!" or ""
+
+	-- Update current target
+	if foundAny then
+		lastTarget = candidate
+	else
+		lastTarget = nil
+	end
 end
 
--- Initial update and periodic refresh
+-- Initial update
 updateDisplay()
-game:GetService("RunService").Heartbeat:Connect(function()
+
+-- Periodic UI refresh
+RunService.Heartbeat:Connect(function()
 	if tick() % 0.5 < 0.1 then
 		updateDisplay()
+	end
+end)
+
+-- Follow loop (separate, lightweight)
+task.spawn(function()
+	while true do
+		task.wait(0.15)
+		if gui.Enabled and autoEnabled and lastTarget then
+			-- If the target moved or time passed, re-path
+			moveToTarget(lastTarget)
+		end
 	end
 end)
 
