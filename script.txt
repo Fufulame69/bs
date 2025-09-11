@@ -1,115 +1,82 @@
--- Create the main GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "AnimalInfoDisplay"
-gui.ResetOnSpawn = false
-gui.Parent = game:GetService("CoreGui") -- Use CoreGui for executor compatibility
+-- Load the Rayfield library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Create the frame
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 400)
-frame.Position = UDim2.new(0.5, -150, 0.5, -200)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-frame.Parent = gui
+-- Create the main window
+local Window = Rayfield:CreateWindow({
+   Name = "Animal Info Display",
+   LoadingTitle = "Animal Information",
+   LoadingSubtitle = "Loading Data...",
+   ToggleUIKeybind = "End", -- You can change this keybind
+})
 
--- Create title
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Text = "Rendered Moving Animals"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.SourceSansBold
-title.TextSize = 18
-title.Parent = frame
+-- Create a tab to hold the information
+local AnimalTab = Window:CreateTab("Rendered Animals", "footprints") -- Using a lucide icon
 
--- Create scroll frame
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1, -10, 1, -40)
-scrollFrame.Position = UDim2.new(0, 5, 0, 35)
-scrollFrame.BackgroundTransparency = 1
-scrollFrame.ScrollBarThickness = 6
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrollFrame.Parent = frame
+-- Create a paragraph element that will display all the animal data.
+-- We will update this element instead of creating and destroying labels.
+local InfoParagraph = AnimalTab:CreateParagraph({
+    Title = "Live Animal Data", 
+    Content = "Searching for animals..."
+})
 
--- Create UIListLayout
-local listLayout = Instance.new("UIListLayout")
-listLayout.Padding = UDim.new(0, 5)
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Parent = scrollFrame
-
--- Function to update the display
+-- Function to update the display with the latest animal info
 local function updateDisplay()
-    -- Clear existing labels
-    for _, child in ipairs(scrollFrame:GetChildren()) do
-        if child:IsA("TextLabel") then
-            child:Destroy()
+    local animalsFolder = workspace:FindFirstChild("RenderedMovingAnimals")
+    local animalCount = 0
+    local contentString = ""
+
+    -- Check if the folder exists and has animals in it
+    if not animalsFolder or #animalsFolder:GetChildren() == 0 then
+        contentString = "No rendered moving animals found in workspace."
+    else
+        local allAnimalInfo = {}
+        animalCount = #animalsFolder:GetChildren()
+
+        for _, animal in ipairs(animalsFolder:GetChildren()) do
+            -- Safely get position, default to (0,0,0) if no primary part
+            local pos = animal.PrimaryPart and animal.PrimaryPart.Position or Vector3.new(0, 0, 0)
+            
+            -- Safely get a number from the debug ID as in the original script
+            local debugIdNum = 0
+            local success, result = pcall(function()
+                debugIdNum = animal:GetDebugId(100):sub(1, 4):byte(1)
+            end)
+            if not success or not debugIdNum then
+                debugIdNum = 0 -- Fallback if it fails
+            end
+
+            -- Format the string for this animal
+            local infoLine = string.format(
+                "%s [%d] - Pos: (%.1f, %.1f, %.1f)",
+                animal.Name,
+                debugIdNum,
+                pos.X,
+                pos.Y,
+                pos.Z
+            )
+            table.insert(allAnimalInfo, infoLine)
         end
+        -- Join all the individual animal lines into one string
+        contentString = table.concat(allAnimalInfo, "\n")
     end
 
-    local animals = workspace:FindFirstChild("RenderedMovingAnimals")
-    if not animals then
-        local noAnimalsLabel = Instance.new("TextLabel")
-        noAnimalsLabel.Size = UDim2.new(1, -10, 0, 20)
-        noAnimalsLabel.BackgroundTransparency = 1
-        noAnimalsLabel.Text = "RenderedMovingAnimals not found"
-        noAnimalsLabel.TextColor3 = Color3.new(1, 1, 1)
-        noAnimalsLabel.Font = Enum.Font.SourceSans
-        noAnimalsLabel.TextSize = 14
-        noAnimalsLabel.TextXAlignment = Enum.TextXAlignment.Left
-        noAnimalsLabel.Parent = scrollFrame
-        return
-    end
-
-    local totalHeight = 0
-    for _, animal in ipairs(animals:GetChildren()) do
-        local info = string.format(
-            "%s [%d] - Pos: (%.1f, %.1f, %.1f)",
-            animal.Name,
-            animal:GetDebugId(100):sub(1, 4):byte(1) or 0,
-            animal.PrimaryPart and animal.PrimaryPart.Position.X or 0,
-            animal.PrimaryPart and animal.PrimaryPart.Position.Y or 0,
-            animal.PrimaryPart and animal.PrimaryPart.Position.Z or 0
-        )
-        
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1, -10, 0, 20)
-        label.BackgroundTransparency = 1
-        label.Text = info
-        label.TextColor3 = Color3.new(1, 1, 1)
-        label.Font = Enum.Font.SourceSans
-        label.TextSize = 14
-        label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Parent = scrollFrame
-        
-        totalHeight = totalHeight + 25
-    end
-    
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+    -- Update the paragraph with the new title and content
+    InfoParagraph:Set({
+        Title = "Live Animal Data (" .. animalCount .. ")", 
+        Content = contentString
+    })
 end
 
--- Initial update
-updateDisplay()
-
--- Update every 0.5 seconds
-game:GetService("RunService").Heartbeat:Connect(function()
-    if tick() % 0.5 < 0.1 then
-        updateDisplay()
+-- Create a loop that runs the update function every 0.5 seconds
+task.spawn(function()
+    -- The `while true do` loop will run forever until the script is stopped.
+    -- The `Window.Visible` check ensures it only updates when the UI is actually open.
+    while true do
+        if Window.Visible then
+            -- We wrap the update function in a pcall (protected call) to prevent
+            -- any errors from stopping the entire loop.
+            pcall(updateDisplay)
+        end
+        task.wait(0.5)
     end
-end)
-
--- Close button
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 20, 0, 20)
-closeBtn.Position = UDim2.new(1, -25, 0, 5)
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-closeBtn.Text = "X"
-closeBtn.TextColor3 = Color3.new(1, 1, 1)
-closeBtn.Font = Enum.Font.SourceSansBold
-closeBtn.TextSize = 14
-closeBtn.Parent = frame
-
-closeBtn.MouseButton1Click:Connect(function()
-    gui:Destroy()
 end)
