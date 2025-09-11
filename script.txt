@@ -1,186 +1,238 @@
--- Rayfield-powered "Rendered Moving Animals" viewer
--- Requires an executor with HttpGet enabled
+-- Create the main GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "AnimalInfoDisplay"
+gui.ResetOnSpawn = false
+gui.Parent = game:GetService("CoreGui") -- Use CoreGui for executor compatibility
 
--- Load Rayfield
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- Create the frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 480)
+frame.Position = UDim2.new(0.5, -150, 0.5, -240)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = gui
 
--- === Window ===
-local Window = Rayfield:CreateWindow({
-    Name = "Animal Info Display",
-    Icon = "rewind",                 -- Lucide icon example per docs
-    LoadingTitle = "Rayfield Interface Suite",
-    LoadingSubtitle = "by Sirius",
-    ShowText = "Rayfield",
-    Theme = "Default",
+-- ===== DRAGGING (custom, non-deprecated) =====
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos
 
-    ToggleUIKeybind = "K",
-
-    DisableRayfieldPrompts = false,
-    DisableBuildWarnings = false,
-
-    ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "AnimalViewer",
-        FileName = "RenderedMovingAnimals"
-    },
-
-    Discord = { Enabled = false },
-    KeySystem = false
-})
-
--- === Tab & Section ===
-local Tab = Window:CreateTab("Animals", "rewind")
-local Section = Tab:CreateSection("Rendered Moving Animals")
-
--- A label to show status (count / errors)
-local StatusLabel = Tab:CreateLabel("Status: Waiting...")
-
--- We'll maintain one Paragraph per animal (easier multi-line + auto-size)
--- Map of instance -> Paragraph UI
-local AnimalParagraphs = {}
-
--- === Settings (with config flags so they persist) ===
-local RefreshRate = 0.5
-local ShowIDs = true
-local AutoRefreshEnabled = true
-
-local ToggleAuto = Tab:CreateToggle({
-    Name = "Auto Refresh",
-    CurrentValue = true,
-    Flag = "AutoRefreshToggle",
-    Callback = function(v)
-        AutoRefreshEnabled = v
-    end
-})
-
-local SliderRate = Tab:CreateSlider({
-    Name = "Refresh Rate",
-    Range = {0.1, 5},
-    Increment = 0.1,
-    Suffix = "sec",
-    CurrentValue = 0.5,
-    Flag = "RefreshRateSlider",
-    Callback = function(v)
-        RefreshRate = v
-    end
-})
-
-local ToggleIDs = Tab:CreateToggle({
-    Name = "Show Instance IDs",
-    CurrentValue = true,
-    Flag = "ShowIDsToggle",
-    Callback = function(v)
-        ShowIDs = v
-    end
-})
-
-local RefreshBtn = Tab:CreateButton({
-    Name = "Refresh Now",
-    Callback = function()
-        task.spawn(function()
-            updateDisplay()
-        end)
-    end
-})
-
--- === Utilities ===
-local function fmtVec3(vec3)
-    return string.format("(%.1f, %.1f, %.1f)", vec3.X, vec3.Y, vec3.Z)
+local function onInputBegan(input, gpe)
+	if gpe then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+	end
 end
 
-local function animalInfo(animal)
-    local idStr = ""
-    if ShowIDs then
-        -- Robust ID: use GetDebugId if available, else fallback
-        local ok, id = pcall(function()
-            return animal:GetDebugId(100)
-        end)
-        if ok and id then
-            idStr = " [" .. tostring(id):sub(1, 8) .. "]"
-        end
-    end
-    local pp = animal.PrimaryPart
-    local pos = pp and pp.Position or Vector3.new()
-    return string.format("%s%s\nPos: %s", animal.Name, idStr, fmtVec3(pos))
+local function onInputChanged(input, gpe)
+	if gpe then return end
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y
+		)
+	end
 end
 
-local function clearMissingParagraphs(currentSet)
-    -- Remove UI paragraphs for animals that no longer exist
-    for instanceRef, para in pairs(AnimalParagraphs) do
-        if not currentSet[instanceRef] then
-            -- Destroy paragraph UI by resetting to empty and dropping ref
-            para:Set("Removed", nil, nil, true)
-            AnimalParagraphs[instanceRef] = nil
-        end
-    end
+local function onInputEnded(input, gpe)
+	if gpe then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
 end
 
--- === Core updater ===
-function updateDisplay()
-    local container = workspace:FindFirstChild("RenderedMovingAnimals")
-    if not container then
-        StatusLabel:Set("Status: 'RenderedMovingAnimals' not found")
-        -- Also nuke any previous paragraphs since container is missing
-        clearMissingParagraphs({})
-        return
-    end
+-- Drag from the title bar area (made below), but also allow grabbing anywhere on the frame background.
+frame.InputBegan:Connect(onInputBegan)
+frame.InputChanged:Connect(onInputChanged)
+frame.InputEnded:Connect(onInputEnded)
 
-    local children = container:GetChildren()
-    StatusLabel:Set(("Status: %d animal%s"):format(#children, #children == 1 and "" or "s"))
+-- Create title bar
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Rendered Moving Animals"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 18
+title.Parent = frame
+-- Also wire drag through the title (nice UX)
+title.InputBegan:Connect(onInputBegan)
+title.InputChanged:Connect(onInputChanged)
+title.InputEnded:Connect(onInputEnded)
 
-    -- Track which ones we saw this frame
-    local seen = {}
+-- === SEARCH BOX (your previous addition) ===
+local searchBox = Instance.new("TextBox")
+searchBox.Size = UDim2.new(1, -10, 0, 25)
+searchBox.Position = UDim2.new(0, 5, 0, 35)
+searchBox.PlaceholderText = "Type animal name..."
+searchBox.Text = ""
+searchBox.TextColor3 = Color3.new(0, 0, 0)
+searchBox.Font = Enum.Font.SourceSans
+searchBox.TextSize = 14
+searchBox.Parent = frame
 
-    for _, animal in ipairs(children) do
-        seen[animal] = true
-        local para = AnimalParagraphs[animal]
+-- === KEYBIND ROW ===
+local keyRow = Instance.new("Frame")
+keyRow.Size = UDim2.new(1, -10, 0, 25)
+keyRow.Position = UDim2.new(0, 5, 0, 65)
+keyRow.BackgroundTransparency = 1
+keyRow.Parent = frame
 
-        if not para then
-            -- Create a new paragraph for this animal
-            para = Tab:CreateParagraph({
-                Title = animal.Name,
-                Content = animalInfo(animal)
-            })
-            AnimalParagraphs[animal] = para
+local keyLbl = Instance.new("TextLabel")
+keyLbl.Size = UDim2.new(0, 120, 1, 0)
+keyLbl.BackgroundTransparency = 1
+keyLbl.Text = "Toggle key:"
+keyLbl.TextColor3 = Color3.new(1, 1, 1)
+keyLbl.Font = Enum.Font.SourceSans
+keyLbl.TextSize = 14
+keyLbl.TextXAlignment = Enum.TextXAlignment.Left
+keyLbl.Parent = keyRow
 
-            -- Clean up mapping if the instance is removed from the game
-            animal.AncestryChanged:Connect(function(_, parent)
-                if parent == nil and AnimalParagraphs[animal] then
-                    AnimalParagraphs[animal]:Set("Removed", "Deleted from workspace")
-                    AnimalParagraphs[animal] = nil
-                end
-            end)
-        else
-            -- Update existing paragraph
-            para:Set({ Title = animal.Name, Content = animalInfo(animal) })
-        end
-    end
+local keyBox = Instance.new("TextBox")
+keyBox.Size = UDim2.new(1, -125, 1, 0)
+keyBox.Position = UDim2.new(0, 120, 0, 0)
+keyBox.PlaceholderText = "e.g. RightShift, P, F4"
+keyBox.Text = "RightShift"
+keyBox.TextColor3 = Color3.new(0, 0, 0)
+keyBox.Font = Enum.Font.SourceSans
+keyBox.TextSize = 14
+keyBox.Parent = keyRow
 
-    clearMissingParagraphs(seen)
+-- Warning label (appears if a searched animal is found)
+local warningLabel = Instance.new("TextLabel")
+warningLabel.Size = UDim2.new(1, -10, 0, 20)
+warningLabel.Position = UDim2.new(0, 5, 0, 95)
+warningLabel.BackgroundTransparency = 1
+warningLabel.Text = ""
+warningLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+warningLabel.Font = Enum.Font.SourceSansBold
+warningLabel.TextSize = 16
+warningLabel.Visible = false
+warningLabel.Parent = frame
+
+-- Scroll frame (list of animals)
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -10, 1, -155)
+scrollFrame.Position = UDim2.new(0, 5, 0, 130)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.Parent = frame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 5)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = scrollFrame
+
+-- === TOGGLE VISIBILITY VIA KEYBIND ===
+local currentKeyCode = Enum.KeyCode.RightShift
+local function parseKeyCode(txt)
+	-- Try exact KeyCode match first
+	if Enum.KeyCode[txt] then return Enum.KeyCode[txt] end
+	-- Try single letter/number convenience (e.g., "p" -> "P")
+	local upper = string.upper(txt)
+	if Enum.KeyCode[upper] then return Enum.KeyCode[upper] end
+	return nil
 end
 
--- Initial draw
-updateDisplay()
-
--- === Auto refresh loop using Heartbeat with dt accumulator ===
-local RunService = game:GetService("RunService")
-local accum = 0
-RunService.Heartbeat:Connect(function(dt)
-    if not AutoRefreshEnabled then return end
-    accum += dt
-    if accum >= RefreshRate then
-        accum = 0
-        updateDisplay()
-    end
+keyBox.FocusLost:Connect(function(enterPressed)
+	local code = parseKeyCode(keyBox.Text)
+	if code then
+		currentKeyCode = code
+		keyBox.TextColor3 = Color3.new(0, 0.4, 0)
+	else
+		keyBox.TextColor3 = Color3.fromRGB(200, 0, 0)
+	end
 end)
 
--- Optional: quick toast so users know where to toggle the UI
-Rayfield:Notify({
-    Title = "Animal Viewer",
-    Content = "Press 'K' to toggle the UI",
-    Duration = 4.5,
-    Image = "rewind"
-})
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	-- Don't toggle while user is typing in a TextBox
+	if UIS:GetFocusedTextBox() then return end
+	if input.KeyCode == currentKeyCode then
+		gui.Enabled = not gui.Enabled
+	end
+end)
 
--- Load saved config (restores flags like AutoRefresh, RefreshRate, ShowIDs)
-Rayfield:LoadConfiguration()
+-- === UPDATE LIST + SEARCH MATCH ===
+local function updateDisplay()
+	-- Clear existing labels
+	for _, child in ipairs(scrollFrame:GetChildren()) do
+		if child:IsA("TextLabel") then
+			child:Destroy()
+		end
+	end
+
+	local animals = workspace:FindFirstChild("RenderedMovingAnimals")
+	if not animals then
+		local noAnimalsLabel = Instance.new("TextLabel")
+		noAnimalsLabel.Size = UDim2.new(1, -10, 0, 20)
+		noAnimalsLabel.BackgroundTransparency = 1
+		noAnimalsLabel.Text = "RenderedMovingAnimals not found"
+		noAnimalsLabel.TextColor3 = Color3.new(1, 1, 1)
+		noAnimalsLabel.Font = Enum.Font.SourceSans
+		noAnimalsLabel.TextSize = 14
+		noAnimalsLabel.TextXAlignment = Enum.TextXAlignment.Left
+		noAnimalsLabel.Parent = scrollFrame
+		scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 25)
+		warningLabel.Visible = false
+		return
+	end
+
+	local totalHeight = 0
+	local searchTerm = string.lower(searchBox.Text)
+	local found = false
+
+	for _, animal in ipairs(animals:GetChildren()) do
+		local pos = Vector3.new(0,0,0)
+		if animal.PrimaryPart then
+			pos = animal.PrimaryPart.Position
+		end
+		local info = string.format("%s - Pos: (%.1f, %.1f, %.1f)", animal.Name, pos.X, pos.Y, pos.Z)
+
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.new(1, -10, 0, 20)
+		label.BackgroundTransparency = 1
+		label.Text = info
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.Font = Enum.Font.SourceSans
+		label.TextSize = 14
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.Parent = scrollFrame
+
+		totalHeight = totalHeight + 25
+
+		if searchTerm ~= "" and string.find(string.lower(animal.Name), searchTerm) then
+			found = true
+		end
+	end
+
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+	warningLabel.Visible = found
+	warningLabel.Text = found and "animal found!" or ""
+end
+
+-- Initial update and periodic refresh
+updateDisplay()
+game:GetService("RunService").Heartbeat:Connect(function()
+	if tick() % 0.5 < 0.1 then
+		updateDisplay()
+	end
+end)
+
+-- Close button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 20, 0, 20)
+closeBtn.Position = UDim2.new(1, -25, 0, 5)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Font = Enum.Font.SourceSansBold
+closeBtn.TextSize = 14
+closeBtn.Parent = frame
+closeBtn.MouseButton1Click:Connect(function()
+	gui:Destroy()
+end)
